@@ -5,13 +5,14 @@ class Database {
     public static function connect() {
         if (self::$pdo === null) {
             try {
-                // Potential paths to find bible_app.db
+                // Nuclear Option: Anchor to Document Root
+                $root = $_SERVER['DOCUMENT_ROOT'] ?: __DIR__ . '/..';
+                
                 $candidates = [
-                    __DIR__ . '/../../assets/bible_app.db', // Standard Structure (Dev/Prod)
-                    __DIR__ . '/../assets/bible_app.db',    // Flattened Structure
-                    __DIR__ . '/assets/bible_app.db',       // Direct inclusion
-                    'assets/bible_app.db',                  // Relative to web root
-                    'bible_app.db'                          // Root fallback
+                    $root . '/../assets/bible_app.db',      // Standard Prod Structure
+                    $root . '/assets/bible_app.db',         // Flat Structure
+                    __DIR__ . '/../../assets/bible_app.db', // Fallback Relative
+                    'C:/bible/modern_app/assets/bible_app.db' // Local Debug Fallback
                 ];
 
                 $dbPath = null;
