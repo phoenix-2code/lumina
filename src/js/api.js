@@ -179,6 +179,20 @@ function updatePaneContent(paneId) {
             contentDiv.innerHTML = `<div style="padding:20px; text-align:center;">Enter keywords.</div>`;
             return;
         }
+
+        // Inline Debug Display
+        if (state.searchQuery === 'DEBUG') {
+            contentDiv.innerHTML = 'Running System Diagnostic...';
+            fetch('debug.php')
+                .then(r => r.text())
+                .then(html => {
+                    contentDiv.innerHTML = `<div style="font-family:monospace; font-size:12px; white-space:pre-wrap; background:#000; color:#0f0; padding:20px; border-radius:8px;">${html}</div>`;
+                })
+                .catch(e => {
+                    contentDiv.innerHTML = `<div style="color:red; padding:20px;">Diagnostic Failed: ${e.message}</div>`;
+                });
+            return;
+        }
         
         fetch(`api.php?action=search&q=${encodeURIComponent(state.searchQuery)}&version=${state.version}&scope=${encodeURIComponent(state.searchScope)}`)
             .then(r => r.json())
