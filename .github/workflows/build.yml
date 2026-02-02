@@ -1,0 +1,33 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on tags like v1.0.0, v1.0.1
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    permissions:
+      contents: write # Needed to upload the release
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          lfs: true # Important: Download the 300MB Database
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build & Publish
+        run: npm run dist
+        env:
+          # GitHub automatically provides this token
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
