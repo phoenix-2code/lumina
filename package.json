@@ -1,0 +1,40 @@
+{
+  "name": "faithstream",
+  "version": "1.0.0",
+  "description": "Premium Bible Study Software",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "author": "PHOENIX",
+  "license": "MIT",
+  "dependencies": {
+    "electron-updater": "^6.1.7"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.faithstream.app",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "YOUR_GITHUB_USERNAME",
+        "repo": "faithstream"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "extraResources": [
+      "php/**",
+      "assets/**",
+      "src/**"
+    ]
+  }
+}

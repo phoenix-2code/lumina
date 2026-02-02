@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FaithStream</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="ribbon">
+    <div class="ribbon-tabs">
+        <div style="display:flex; gap:2px;">
+            <div class="ribbon-tab active" onclick="switchTab('tab-bible')">Bible</div>
+            <div class="ribbon-tab" onclick="switchTab('tab-comm')">Commentaries</div>
+            <div class="ribbon-tab" onclick="switchTab('tab-dict')">Dictionaries</div>
+            <div class="ribbon-tab" onclick="switchTab('tab-lex')">Lexicons</div>
+            <div class="ribbon-tab" onclick="switchTab('tab-search')">Search</div>
+            <div class="ribbon-tab" onclick="switchTab('tab-win')">Windows</div>
+            <div class="ribbon-tab" onclick="switchTab('tab-settings')">Settings</div>
+        </div>
+        <div style="display:flex; align-items:center; padding-right:10px;">
+            <button onclick="toggleRibbon()" class="ribbon-collapse-btn" style="border:none; background:transparent; cursor:pointer; color:var(--text-muted); font-weight:900; font-size:20px;">^</button>
+        </div>
+    </div>
+    
+    <div class="ribbon-content" id="tab-bible">
+        <div class="ribbon-group"><div class="control-pod">
+            <button id="btn-nav-back" onclick="goBack()" style="font-weight:900;" title="Back History">‹</button>
+            <button id="btn-nav-fwd" onclick="goForward()" style="font-weight:900;" title="Forward History">›</button>
+            <div style="height:20px; border-left:1px solid var(--border); margin:0 2px;"></div>
+            <button onclick="navStep(-1)" title="Previous Chapter">←</button>
+            <select id="sel-book" onchange="navigate()"></select>
+            <input type="number" id="inp-chapter" value="1" min="1" style="width:40px; border:none; background:transparent; font-weight:bold; text-align:center;" onchange="navigate()">
+            <select id="sel-verse" onchange="setVerse(this.value); scrollVerse(this.value)" style="width:50px; border:none; background:transparent; font-weight:bold;"></select>
+            <button onclick="navStep(1)" title="Next Chapter">→</button>
+        </div><div class="ribbon-label">Navigation</div></div>
+        
+        <div class="ribbon-group"><div class="control-pod">
+            <select id="sel-version" onchange="reloadPanes()"></select>
+            <button onclick="toggleInterlinear()" id="btn-interlinear">Interlinear: OFF</button>
+        </div><div class="ribbon-label">Translation</div></div>
+        
+        <div class="ribbon-group"><button onclick="changePaneContent('pane-2', 'xrefs')" class="primary">Show Cross-Refs</button><div class="ribbon-label">Study Tools</div></div>
+    </div>
+
+    <div class="ribbon-content" id="tab-comm" style="display:none;">
+        <div class="ribbon-group" style="flex:1; border:none;">
+            <div id="comm-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:8px;"></div>
+            <div class="ribbon-label">Select Commentary</div>
+        </div>
+    </div>
+
+    <div class="ribbon-content" id="tab-dict" style="display:none;">
+        <div class="ribbon-group"><div class="control-pod">
+            <select id="sel-dict-mod" onchange="state.dictModule=this.value; changePaneContent('pane-2','dictionary')">
+                <option value="EASTON">Easton's</option><option value="SMITH">Smith's</option><option value="ATSD">ATSD</option><option value="NAMES">Names</option>
+            </select>
+            <div style="height:20px; border-left:1px solid var(--border); margin:0 2px;"></div>
+            <input type="text" id="inp-dict-search" placeholder="Search..." onkeydown="if(event.key==='Enter') searchDict()">
+            <button onclick="searchDict()" class="primary">Find</button>
+        </div><div class="ribbon-label">Dictionary</div></div>
+    </div>
+
+    <div class="ribbon-content" id="tab-lex" style="display:none;">
+        <div class="ribbon-group"><div class="control-pod">
+            <select id="sel-lex-mod" onchange="state.lexModule=this.value; changePaneContent('pane-2','lex_browse')">
+                <option value="HEBREW">Hebrew</option><option value="GREEK">Greek</option>
+            </select>
+            <div style="height:20px; border-left:1px solid var(--border); margin:0 2px;"></div>
+            <input type="text" id="inp-lex-search" placeholder="H123..." onkeydown="if(event.key==='Enter') searchLex()">
+            <button onclick="searchLex()" class="primary">Find</button>
+        </div><div class="ribbon-label">Lexicon</div></div>
+    </div>
+
+    <div class="ribbon-content" id="tab-search" style="display:none;">
+        <div class="ribbon-group"><div class="control-pod">
+            <select id="sel-search-scope"><option value="ALL">Entire Bible</option><option value="OT">Old Testament</option><option value="NT">New Testament</option><option value="CURRENT">Current Book</option></select>
+            <div style="height:20px; border-left:1px solid var(--border); margin:0 2px;"></div>
+            <input type="text" id="inp-bible-search" placeholder="Words..." onkeydown="if(event.key==='Enter') searchBible()" style="min-width:200px; border:none; background:transparent;">
+            <button onclick="searchBible()" class="primary">Search</button>
+        </div><div class="ribbon-label">Search</div></div>
+    </div>
+
+    <div class="ribbon-content" id="tab-win" style="display:none;">
+        <div class="ribbon-group"><div class="control-pod"><button onclick="setLayout('vertical')">|| Vertical</button><div style="height:20px; border-left:1px solid var(--border); margin:0 2px;"></div><button onclick="setLayout('horizontal')">= Horizontal</button></div><div class="ribbon-label">Layout</div></div>
+        <div class="ribbon-group"><button onclick="resetLayout()">Restore Windows</button><div class="ribbon-label">Manager</div></div>
+    </div>
+
+    <div class="ribbon-content" id="tab-settings" style="display:none;">
+        <div class="ribbon-group"><button onclick="toggleTheme()" id="btn-theme">Toggle Theme</button><div class="ribbon-label">Appearance</div></div>
+        <div class="ribbon-group">
+            <div class="control-pod">
+                <button onclick="changeFontSize(-1)" style="font-size:14px; font-weight:bold;">A-</button>
+                <span id="lbl-font-size" style="font-size:12px; min-width:30px; text-align:center; font-weight:600; color:var(--text-muted);">18px</span>
+                <button onclick="changeFontSize(1)" style="font-size:16px; font-weight:bold;">A+</button>
+            </div>
+            <div class="ribbon-label">Text Size</div>
+        </div>
+    </div>
+</div>
+
+<div id="workspace" class="layout-vertical">
+    <div class="pane" id="pane-1" data-type="bible">
+        <div class="pane-header">
+            <div>
+                <select onchange="changePaneContent('pane-1', this.value)">
+                    <option value="bible">Bible</option>
+                    <option value="commentary">Commentary</option>
+                </select>
+                <span id="pane-1-title"></span>
+            </div>
+            <div class="win-controls">
+                <div class="win-btn" onclick="toggleMin('pane-1')">_</div>
+                <div class="win-btn" onclick="toggleMax('pane-1')">□</div>
+                <div class="win-btn close" onclick="closePane('pane-1')">×</div>
+            </div>
+        </div>
+        <div class="pane-content" id="pane-1-content"></div>
+    </div>
+    <div class="pane" id="pane-2" data-type="commentary">
+        <div class="pane-header">
+            <div>
+                <select onchange="changePaneContent('pane-2', this.value)">
+                    <option value="commentary">Commentary</option>
+                    <option value="xrefs">Cross-Refs</option>
+                    <option value="dictionary">Dictionary</option>
+                    <option value="lex_browse">Lexicon</option>
+                    <option value="search">Search</option>
+                </select>
+                <span id="pane-2-title"></span>
+            </div>
+            <div class="win-controls">
+                <div class="win-btn" onclick="toggleMin('pane-2')">_</div>
+                <div class="win-btn" onclick="toggleMax('pane-2')">□</div>
+                <div class="win-btn close" onclick="closePane('pane-2')">×</div>
+            </div>
+        </div>
+        <div class="pane-content" id="pane-2-content"></div>
+    </div>
+</div>
+
+<div id="update-banner" style="display:none; position:fixed; bottom:20px; right:20px; background:var(--accent); color:white; padding:15px 25px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.3); z-index:1000; align-items:center; gap:15px;">
+    <span id="update-msg">New version available! Downloading...</span>
+    <button id="restart-btn" onclick="restartApp()" style="display:none; background:white; color:var(--accent); border:none; padding:8px 15px; border-radius:4px; font-weight:bold; cursor:pointer;">Restart Now</button>
+</div>
+
+<script src="js/state.js"></script>
+<script src="js/cache.js"></script>
+<script src="js/api.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+<script src="js/updates.js"></script>
+
+</body>
+</html>
