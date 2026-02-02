@@ -331,6 +331,12 @@ mark {
 }
 .ribbon-group select:hover { background: rgba(0,0,0,0.05); border-radius: 4px; }
 
+/* FIX: Dropdown Option Colors */
+.ribbon-group select option {
+    background-color: var(--bg-panel);
+    color: var(--text-main);
+}
+
 .ribbon-group button {
     border: 1px solid transparent;
     background: transparent;
