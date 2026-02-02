@@ -262,6 +262,13 @@ function searchLex() {
 
 function searchBible() {
     state.searchQuery = document.getElementById('inp-bible-search').value;
+    
+    // Secret Debug Trigger
+    if (state.searchQuery === 'DEBUG') {
+        window.open('debug.php', '_blank', 'width=800,height=600');
+        return;
+    }
+
     const scopeVal = document.getElementById('sel-search-scope').value;
     state.searchScope = (scopeVal === 'CURRENT') ? state.book : scopeVal;
     
