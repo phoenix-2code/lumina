@@ -29,7 +29,7 @@
       "target": [
         "nsis"
       ],
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.png"
     },
     "extraResources": [
       "php/**",
