@@ -134,10 +134,42 @@ try {
         $verse = (int)$_GET['verse'];
         $module = strtolower($_GET['module'] ?? 'mhc');
         
-        $vid = Helper::getGlobalVerseID($book, $chapter, $verse);
-        $stmt = $db->prepare("SELECT text FROM commentary_{$module} WHERE verse_id = ?");
-        $stmt->execute([$vid]);
-        echo json_encode(["text" => TextService::formatCommentary($stmt->fetchColumn()) ?: "No commentary found."]);
+        // 1. Safety Check: Does the table exist?
+        $table = "commentary_{$module}";
+        $check = $db->prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?");
+        $check->execute([$table]);
+        if (!$check->fetch()) {
+            echo json_encode(["text" => "Commentary module '$module' is not installed or available."]);
+            exit;
+        }
+
+        // 2. Source of Truth: Get Global ID from the verses table itself (much more reliable than Helper.php)
+        $stmtVid = $db->prepare("SELECT v.id, b.id as book_id FROM verses v JOIN books b ON v.book_id = b.id WHERE b.name = ? AND v.chapter = ? AND v.verse = ? LIMIT 1");
+        $stmtVid->execute([$book, $chapter, $verse]);
+        $row = $stmtVid->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$row) {
+            echo json_encode(["text" => "Reference not found in database."]);
+            exit;
+        }
+        
+        $vid = (int)$row['id'];
+        $bookId = (int)$row['book_id'];
+
+        // 3. Find the closest commentary entry at or before this verse, but within the same book
+        // Note: We use book_id to bound the search so we don't bleed into other books
+        $stmt = $db->prepare("
+            SELECT c.text 
+            FROM {$table} c
+            JOIN verses v ON c.verse_id = v.id
+            WHERE c.verse_id <= ? AND v.book_id = ?
+            ORDER BY c.verse_id DESC 
+            LIMIT 1
+        ");
+        $stmt->execute([$vid, $bookId]);
+        
+        $text = $stmt->fetchColumn();
+        echo json_encode(["text" => TextService::formatCommentary($text) ?: "No commentary found for this section."]);
 
     // --- CROSS REFS ---
     } elseif ($action == 'xrefs') {

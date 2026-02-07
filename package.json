@@ -1,6 +1,6 @@
 {
   "name": "faithstream",
-  "version": "1.0.7",
+  "version": "1.0.9",
   "description": "Premium Bible Study Software",
   "main": "main.js",
   "scripts": {
