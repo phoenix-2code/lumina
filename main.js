@@ -10,15 +10,32 @@ const PORT = 8000;
 
 // --- 1. CONFIGURATION ---
 // In production (bundled), PHP is in resources/php/php.exe
-// In development, we use the system 'php' command
+// Use the bundled PHP in both dev and production for consistency
 const isDev = !app.isPackaged;
-const phpExec = isDev ? 'php' : path.join(process.resourcesPath, 'php', 'php.exe');
+const phpExec = isDev 
+    ? path.join(__dirname, 'php', 'php.exe') 
+    : path.join(process.resourcesPath, 'php', 'php.exe');
 const webRoot = isDev ? path.join(__dirname, 'src') : path.join(process.resourcesPath, 'src');
+const dbPath = isDev 
+    ? path.join(__dirname, 'assets', 'bible_app.db') 
+    : path.join(process.resourcesPath, 'assets', 'bible_app.db');
 
 function startPhpServer() {
     console.log(`Starting PHP Server on port ${PORT}...`);
+    console.log(`Web Root: ${webRoot}`);
+    console.log(`DB Path: ${dbPath}`);
+
+    // Pass the DB path as an environment variable to the PHP process
+    const env = { ...process.env, BIBLE_DB_PATH: dbPath };
+    
     // Serve the 'src' directory as the root
-    phpServer = spawn(phpExec, ['-S', `127.0.0.1:${PORT}`, '-t', webRoot], { cwd: webRoot });
+    phpServer = spawn(phpExec, ['-S', `127.0.0.1:${PORT}`, '-t', webRoot], { 
+        cwd: webRoot,
+        env: env 
+    });
+
+    phpServer.stdout.on('data', (data) => console.log(`PHP: ${data}`));
+    phpServer.stderr.on('data', (data) => console.error(`PHP Error: ${data}`));
     phpServer.on('close', (code) => console.log(`PHP exited with code ${code}`));
 }
 
