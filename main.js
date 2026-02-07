@@ -35,7 +35,13 @@ function startPhpServer() {
     });
 
     phpServer.stdout.on('data', (data) => console.log(`PHP: ${data}`));
-    phpServer.stderr.on('data', (data) => console.error(`PHP Error: ${data}`));
+    phpServer.stderr.on('data', (data) => {
+        const msg = data.toString();
+        // Silence noisy access logs but keep real errors
+        if (!msg.includes('Accepted') && !msg.includes('Closing') && !msg.includes('[200]:')) {
+            console.error(`PHP Error: ${msg}`);
+        }
+    });
     phpServer.on('close', (code) => console.log(`PHP exited with code ${code}`));
 }
 
