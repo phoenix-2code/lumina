@@ -45,7 +45,7 @@ try {
         foreach ($verses as &$v) {
             if ($interlinear === 'true') {
                 $stmtW = $db->prepare("
-                    SELECT vw.position, vw.strongs_id, l.transliteration 
+                    SELECT vw.strongs_id, l.transliteration 
                     FROM verse_words vw
                     JOIN lexicon l ON vw.strongs_id = l.id
                     WHERE vw.verse_id = ?
@@ -55,11 +55,18 @@ try {
                 $words = $stmtW->fetchAll(PDO::FETCH_ASSOC);
                 
                 if (!empty($words)) {
-                    // Logic to rebuild text with Strong's tags
-                    // For now, we'll keep it simple or use the existing strongs-tag format
-                    // Since the old 'strongs' column was a merged string, we might need a better way
-                    // But let's assume we want to show tags after specific words.
-                    // (Optimization: In a real app, you'd store word-to-strongs mapping)
+                    $html = $v['text'];
+                    // NOTE: Robust interlinear requires word-by-word mapping. 
+                    // For now, we'll append the Strong's tags to the text as a quick fix 
+                    // or highlight specific key words if the database supports it.
+                    // Given the current structure, we'll append the tags at the end of the verse 
+                    // or use a placeholder approach if preferred.
+                    foreach($words as $w) {
+                        $tag = $w['transliteration'] ?: $w['strongs_id'];
+                        $lexType = (strpos($w['strongs_id'], 'G') === 0) ? 'strong_greek' : 'strong_hebrew';
+                        $html .= " <span class='strongs-tag' onclick=\"event.stopPropagation(); showDef('{$w['strongs_id']}', '$lexType')\">&lt;$tag&gt;</span>";
+                    }
+                    $v['text'] = $html;
                 }
             }
             $v['text'] = TextService::sanitizeHTML($v['text']);
