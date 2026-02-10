@@ -1,6 +1,6 @@
 {
   "name": "lumina",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "description": "Premium Bible Study Software",
   "main": "main.js",
   "scripts": {
@@ -19,13 +19,6 @@
   "build": {
     "appId": "com.lumina.app",
     "productName": "Lumina",
-    "files": [
-      "main.js",
-      "package.json",
-      "src/**/*",
-      "assets/**/*",
-      "php/**/*"
-    ],
     "publish": [
       {
         "provider": "github",
@@ -34,14 +27,7 @@
       }
     ],
     "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
+      "target": "nsis",
       "icon": "assets/icon.ico"
     },
     "nsis": {
@@ -53,6 +39,10 @@
       "php/**",
       "assets/**",
       "src/**"
+    ],
+    "files": [
+      "main.js",
+      "package.json"
     ]
   }
 }
