@@ -24,7 +24,7 @@ try {
         $version = $_GET['version'] ?? 'KJV';
         $interlinear = $_GET['interlinear'] ?? 'false';
         
-        // New Query: Includes dynamic commentary availability check
+        // New Query: Includes dynamic commentary availability check (cross-version)
         $stmt = $db->prepare("
             SELECT 
                 v.id, 
@@ -33,7 +33,11 @@ try {
                 (SELECT GROUP_CONCAT(c.abbreviation) 
                  FROM commentary_entries ce 
                  JOIN commentaries c ON ce.commentary_id = c.id 
-                 WHERE ce.verse_id = v.id) as modules
+                 WHERE ce.verse_id = (
+                    SELECT v2.id FROM verses v2 
+                    WHERE v2.book_id = v.book_id AND v2.chapter = v.chapter AND v2.verse = v.verse AND v2.version = 'KJV'
+                    LIMIT 1
+                 )) as modules
             FROM verses v 
             JOIN books b ON v.book_id = b.id 
             WHERE b.name = :book AND v.chapter = :chapter AND v.version = :version
@@ -116,8 +120,8 @@ try {
         $chapter = (int)$_GET['chapter'];
         $verse = (int)$_GET['verse'];
         
-        // Get global ID
-        $stmtId = $db->prepare("SELECT v.id FROM verses v JOIN books b ON v.book_id = b.id WHERE b.name = ? AND v.chapter = ? AND v.verse = ? LIMIT 1");
+        // Get global ID (Always anchor to KJV for study tools)
+        $stmtId = $db->prepare("SELECT v.id FROM verses v JOIN books b ON v.book_id = b.id WHERE b.name = ? AND v.chapter = ? AND v.verse = ? AND v.version = 'KJV' LIMIT 1");
         $stmtId->execute([$book, $chapter, $verse]);
         $vid = $stmtId->fetchColumn();
 
