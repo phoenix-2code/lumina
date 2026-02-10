@@ -3,36 +3,47 @@ name: Build & Release
 on:
   push:
     tags:
-      - 'v*' # Trigger on tags like v1.0.0, v1.0.1
+      - 'v*'
 
 jobs:
   build:
     runs-on: windows-latest
 
     permissions:
-      contents: write # Needed to upload the release
+      contents: write
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          lfs: true # Important: Download the 300MB Database
+          lfs: true
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, bcmath, sqlite3
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install Dependencies
+      - name: Install Backend Dependencies
+        run: |
+          cd backend
+          composer install --no-dev --optimize-autoloader
+
+      - name: Install Frontend Dependencies
         run: npm install
 
       - name: Build & Publish
-        run: npm run dist
+        run: npm run dist:publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: FaithStream-Setup
+          name: Lumina-Setup
           path: dist/*.exe
