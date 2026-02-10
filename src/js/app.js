@@ -12,6 +12,32 @@ window.onload = function() {
     if(savedSize) state.fontSize = parseInt(savedSize);
     if(typeof applyFontSize === 'function') applyFontSize();
 
+    // Load Persistent Layout
+    const savedLayout = localStorage.getItem('lumina_layout');
+    if (savedLayout) {
+        state.layout = JSON.parse(savedLayout);
+        setLayout(state.layout.orientation);
+        Object.keys(state.layout.panes).forEach(id => {
+            const p = state.layout.panes[id];
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (p.minimized) el.classList.add('minimized');
+            if (p.maximized) el.classList.add('maximized');
+            if (p.closed) el.classList.add('closed');
+            // We'll set the type in step 5
+        });
+    }
+
+    // Load Persistent Navigation
+    const savedNav = localStorage.getItem('lumina_nav');
+    if (savedNav) {
+        const nav = JSON.parse(savedNav);
+        state.book = nav.book;
+        state.chapter = nav.chapter;
+        state.verse = nav.verse;
+        state.version = nav.version;
+    }
+
     // 2. Populate Bible Versions
     fetch('api.php?action=version_list')
         .then(r => r.json())
@@ -23,7 +49,7 @@ window.onload = function() {
                     const opt = document.createElement('option');
                     opt.value = v;
                     opt.text = versionNames[v] || v; 
-                    if(v === 'KJV') opt.selected = true;
+                    if(v === state.version) opt.selected = true;
                     sel.appendChild(opt);
                 });
             }
@@ -98,9 +124,18 @@ window.onload = function() {
 
     // 5. Initial Load
     if(typeof updateVerseSelector === 'function') updateVerseSelector(); 
+    
+    // Update selectors to match state
+    const selBook = document.getElementById('sel-book');
+    const inpChapter = document.getElementById('inp-chapter');
+    if (selBook) selBook.value = state.book;
+    if (inpChapter) inpChapter.value = state.chapter;
+
     if(typeof loadPane === 'function') {
-        loadPane('pane-1');
-        loadPane('pane-2');
+        Object.keys(state.layout.panes).forEach(id => {
+            changePaneContent(id, state.layout.panes[id].type);
+        });
+        
         // Init History
         if(state.history) {
             state.history.push({ book: state.book, chapter: state.chapter, verse: state.verse });

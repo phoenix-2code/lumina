@@ -70,12 +70,42 @@ function toggleRibbon() {
 function setLayout(type) {
     const ws = document.getElementById('workspace');
     ws.className = (type === 'vertical') ? 'layout-vertical' : 'layout-horizontal';
+    state.layout.orientation = type;
+    saveLayoutState();
 }
 
-function toggleMin(id) { document.getElementById(id).classList.toggle('minimized'); }
-function toggleMax(id) { document.getElementById(id).classList.toggle('maximized'); }
-function closePane(id) { document.getElementById(id).classList.add('closed'); }
-function resetLayout() { document.querySelectorAll('.pane').forEach(el => el.classList.remove('closed', 'minimized', 'maximized')); }
+function toggleMin(id) { 
+    document.getElementById(id).classList.toggle('minimized'); 
+    state.layout.panes[id].minimized = document.getElementById(id).classList.contains('minimized');
+    saveLayoutState();
+}
+function toggleMax(id) { 
+    document.getElementById(id).classList.toggle('maximized'); 
+    state.layout.panes[id].maximized = document.getElementById(id).classList.contains('maximized');
+    saveLayoutState();
+}
+function closePane(id) { 
+    document.getElementById(id).classList.add('closed'); 
+    state.layout.panes[id].closed = true;
+    saveLayoutState();
+}
+function resetLayout() { 
+    document.querySelectorAll('.pane').forEach(el => {
+        el.classList.remove('closed', 'minimized', 'maximized');
+        state.layout.panes[el.id] = { type: el.dataset.type, minimized: false, maximized: false, closed: false };
+    });
+    saveLayoutState();
+}
+
+function saveLayoutState() {
+    localStorage.setItem('lumina_layout', JSON.stringify(state.layout));
+    localStorage.setItem('lumina_nav', JSON.stringify({
+        book: state.book,
+        chapter: state.chapter,
+        verse: state.verse,
+        version: state.version
+    }));
+}
 
 // History
 function goBack() {
@@ -184,6 +214,14 @@ function jumpTo(b, c, v, isNew = true) {
     } else {
         reloadPanes();
     }
+    
+    // Scroll to top on chapter change
+    if (v === 1) {
+        const content = document.getElementById('pane-1-content');
+        if (content) content.scrollTop = 0;
+    }
+
+    saveLayoutState();
 }
 
 function setVerse(v) {
@@ -193,8 +231,12 @@ function setVerse(v) {
 
     document.querySelectorAll('.verse-row').forEach(el => el.classList.remove('active'));
     const activeEl = document.getElementById(`v-${v}`);
-    if(activeEl) activeEl.classList.add('active');
+    if(activeEl) {
+        activeEl.classList.add('active');
+        activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
     
+    saveLayoutState();
     updateContextPanes();
 }
 
@@ -333,6 +375,11 @@ function changePaneContent(paneId, type) {
     
     if (type === 'dict_browse') state.lookupTerm = "";
     
+    if (state.layout.panes[paneId]) {
+        state.layout.panes[paneId].type = type;
+    }
+    saveLayoutState();
+    
     loadPane(paneId);
 }
 
@@ -352,4 +399,54 @@ function openComm(mod, v) {
     if(activeEl) activeEl.classList.add('active');
     
     setCommModule(mod.toLowerCase());
+}
+
+// Context Menu Logic
+let contextWord = "";
+
+document.addEventListener('contextmenu', e => {
+    const verseRow = e.target.closest('.verse-row');
+    if (verseRow) {
+        e.preventDefault();
+        
+        // Get the selected word or the word under cursor
+        const selection = window.getSelection().toString().trim();
+        if (selection) {
+            contextWord = selection;
+        } else {
+            // Very simple word detection if no selection
+            const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+            if (range) {
+                range.expand('word');
+                contextWord = range.toString().trim().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"");
+            }
+        }
+
+        if (contextWord && contextWord.length > 1) {
+            const menu = document.getElementById('context-menu');
+            document.getElementById('ctx-word-search').innerText = contextWord;
+            document.getElementById('ctx-word-define').innerText = contextWord;
+            
+            menu.style.display = 'block';
+            menu.style.left = `${e.clientX}px`;
+            menu.style.top = `${e.clientY}px`;
+        }
+    }
+});
+
+document.addEventListener('click', () => {
+    document.getElementById('context-menu').style.display = 'none';
+});
+
+function contextSearch() {
+    if (!contextWord) return;
+    document.getElementById('inp-bible-search').value = contextWord;
+    searchBible();
+}
+
+function contextDefine() {
+    if (!contextWord) return;
+    state.lookupTerm = contextWord;
+    state.lookupType = 'dictionary';
+    changePaneContent('pane-2', 'dictionary');
 }

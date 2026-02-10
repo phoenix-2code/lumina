@@ -15,7 +15,14 @@ const state = {
     interlinear: false,
     fontSize: 18,
     history: [],
-    historyIndex: -1
+    historyIndex: -1,
+    layout: {
+        orientation: 'vertical',
+        panes: {
+            'pane-1': { type: 'bible', minimized: false, maximized: false, closed: false },
+            'pane-2': { type: 'commentary', minimized: false, maximized: false, closed: false }
+        }
+    }
 };
 
 const BIBLE_STRUCTURE = {

@@ -203,6 +203,7 @@ body {
     color: var(--text-main);
     background: var(--bg-panel);
     scrollbar-gutter: stable;
+    user-select: text !important;
 }
 
 /* Cards & Components */
@@ -400,3 +401,20 @@ mark {
     color: white !important;
     border-color: var(--accent) !important;
 }
+
+/* Context Menu */
+.context-menu {
+    user-select: none;
+}
+.menu-item {
+    padding: 8px 15px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--text-main);
+    transition: background 0.1s;
+}
+.menu-item:hover {
+    background: var(--accent);
+    color: white;
+}
+.menu-item span { font-weight: bold; }
