@@ -17,6 +17,10 @@ try {
     $db = Database::connect();
     $action = $_GET['action'] ?? '';
 
+    if (!$action) {
+        throw new Exception("Missing 'action' parameter.");
+    }
+
     // --- BIBLE TEXT ---
     if ($action == 'text') {
         $book = $_GET['book'] ?? 'Genesis';
@@ -24,6 +28,8 @@ try {
         $version = $_GET['version'] ?? 'KJV';
         $interlinear = $_GET['interlinear'] ?? 'false';
         
+        if ($chapter <= 0) throw new Exception("Invalid chapter number.");
+
         // New Query: Includes dynamic commentary availability check (cross-version)
         $stmt = $db->prepare("
             SELECT 
@@ -45,6 +51,10 @@ try {
         $stmt->execute([':book' => $book, ':chapter' => $chapter, ':version' => $version]);
         $verses = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
+        if (empty($verses)) {
+            throw new Exception("No verses found for '$book $chapter' ($version).");
+        }
+
         // Process interlinear/strongs from the new verse_words table if needed
         foreach ($verses as &$v) {
             if ($interlinear === 'true') {
@@ -81,11 +91,15 @@ try {
 
     // --- COMMENTARY ---
     } elseif ($action == 'commentary') {
-        $book = $_GET['book'];
-        $chapter = (int)$_GET['chapter'];
-        $verse = (int)$_GET['verse'];
+        $book = $_GET['book'] ?? '';
+        $chapter = (int)($_GET['chapter'] ?? 0);
+        $verse = (int)($_GET['verse'] ?? 0);
         $module = strtolower($_GET['module'] ?? 'mhc');
         
+        if (!$book || $chapter <= 0 || $verse <= 0) {
+            throw new Exception("Invalid reference for commentary lookup.");
+        }
+
         // 1. Get the sequential ID for this verse
         $stmtId = $db->prepare("
             SELECT v.id 
@@ -98,8 +112,7 @@ try {
         $vid = $stmtId->fetchColumn();
 
         if (!$vid) {
-            echo json_encode(["text" => "Verse not found."]);
-            exit;
+            throw new Exception("Verse not found in canonical index.");
         }
 
         // 2. Fetch from unified commentary table
@@ -116,14 +129,20 @@ try {
 
     // --- CROSS REFS ---
     } elseif ($action == 'xrefs') {
-        $book = $_GET['book'];
-        $chapter = (int)$_GET['chapter'];
-        $verse = (int)$_GET['verse'];
+        $book = $_GET['book'] ?? '';
+        $chapter = (int)($_GET['chapter'] ?? 0);
+        $verse = (int)($_GET['verse'] ?? 0);
         
+        if (!$book || $chapter <= 0 || $verse <= 0) {
+            throw new Exception("Invalid reference for cross-reference lookup.");
+        }
+
         // Get global ID (Always anchor to KJV for study tools)
         $stmtId = $db->prepare("SELECT v.id FROM verses v JOIN books b ON v.book_id = b.id WHERE b.name = ? AND v.chapter = ? AND v.verse = ? AND v.version = 'KJV' LIMIT 1");
         $stmtId->execute([$book, $chapter, $verse]);
         $vid = $stmtId->fetchColumn();
+
+        if (!$vid) throw new Exception("Reference not found.");
 
         $stmt = $db->prepare("
             SELECT b.name as book, v.chapter, v.verse 
@@ -141,6 +160,8 @@ try {
         $type = $_GET['type'] ?? 'dictionary';
         $module = $_GET['module'] ?? 'EASTON';
         
+        if (!$term) throw new Exception("Missing term for definition.");
+
         if ($type == 'strong_hebrew' || $type == 'strong_greek') {
             $stmt = $db->prepare("SELECT definition FROM lexicon WHERE id = ?");
             $stmt->execute([$term]);
@@ -221,9 +242,11 @@ try {
         }
         
         echo json_encode(["results" => $results, "count" => $total]);
+    } else {
+        throw new Exception("Unknown action: $action");
     }
 
 } catch (Exception $e) {
-    http_response_code(500);
+    http_response_code(400); // Bad Request or Server Error
     echo json_encode(["error" => $e->getMessage()]);
 }
