@@ -15,22 +15,28 @@ const isDev = !app.isPackaged;
 const phpExec = isDev 
     ? path.join(__dirname, 'php', 'php.exe') 
     : path.join(process.resourcesPath, 'php', 'php.exe');
-const webRoot = isDev ? path.join(__dirname, 'src') : path.join(process.resourcesPath, 'src');
+const webRoot = isDev ? path.join(__dirname, 'backend', 'public') : path.join(process.resourcesPath, 'backend', 'public');
 const dbPath = isDev 
     ? path.join(__dirname, 'assets', 'data', 'core.db') 
     : path.join(process.resourcesPath, 'assets', 'data', 'core.db');
 
 function startPhpServer() {
-    console.log(`Starting PHP Server on port ${PORT}...`);
+    console.log(`Starting Laravel Backend on port ${PORT}...`);
     console.log(`Web Root: ${webRoot}`);
-    console.log(`DB Path: ${dbPath}`);
 
-    // Pass the DB path as an environment variable to the PHP process
-    const env = { ...process.env, BIBLE_DB_PATH: dbPath };
+    // Pass necessary env vars to Laravel
+    const env = { 
+        ...process.env, 
+        DB_CORE_PATH: dbPath,
+        DB_VERSIONS_PATH: dbPath.replace('core.db', 'versions.db'),
+        DB_COMMENTARIES_PATH: dbPath.replace('core.db', 'commentaries.db'),
+        DB_EXTRAS_PATH: dbPath.replace('core.db', 'extras.db'),
+        APP_KEY: 'base64:ANjMFKHklakCnLbxZd89SV8lIcQfyInk6l1rZV931cI=',
+        APP_DEBUG: 'true'
+    };
     
-    // Serve the 'src' directory as the root
     phpServer = spawn(phpExec, ['-S', `127.0.0.1:${PORT}`, '-t', webRoot], { 
-        cwd: webRoot,
+        cwd: path.join(__dirname, 'backend'),
         env: env 
     });
 
@@ -51,21 +57,16 @@ function createWindow() {
         width: 1280, height: 800,
         title: "Lumina",
         webPreferences: {
-            nodeIntegration: true, // Needed for IPC communication for updates
+            nodeIntegration: true, 
             contextIsolation: false
         },
         autoHideMenuBar: true
     });
 
-    const checkServer = () => {
-        http.get(`http://127.0.0.1:${PORT}/index.html`, (res) => {
-            if (res.statusCode === 200) {
-                mainWindow.loadURL(`http://127.0.0.1:${PORT}/index.html`);
-                if (!isDev) autoUpdater.checkForUpdatesAndNotify();
-            } else { setTimeout(checkServer, 200); }
-        }).on('error', () => setTimeout(checkServer, 200));
-    };
-    checkServer();
+    // Frontend is local HTML, Backend is local PHP server
+    mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
+    
+    if (!isDev) autoUpdater.checkForUpdatesAndNotify();
 }
 
 // --- 3. AUTO-UPDATER EVENTS ---

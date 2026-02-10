@@ -39,7 +39,7 @@ window.onload = function() {
     }
 
     // 2. Populate Bible Versions
-    fetch('api.php?action=version_list')
+    fetch('api/bible/versions')
         .then(r => r.json())
         .then(data => {
             const sel = document.getElementById('sel-version');
@@ -57,7 +57,7 @@ window.onload = function() {
         .catch(e => console.error("Error loading versions:", e));
 
     // 3. Populate Commentaries
-    fetch('api.php?action=commentary_list')
+    fetch('api/study/commentary-list')
         .then(r => r.json())
         .then(data => {
             const container = document.querySelector('#tab-comm .ribbon-group > div');
