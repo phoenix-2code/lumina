@@ -45,9 +45,9 @@ try {
         foreach ($verses as &$v) {
             if ($interlinear === 'true') {
                 $stmtW = $db->prepare("
-                    SELECT vw.strongs_id, l.transliteration 
+                    SELECT vw.word, vw.strongs_id, l.transliteration 
                     FROM verse_words vw
-                    JOIN lexicon l ON vw.strongs_id = l.id
+                    LEFT JOIN lexicon l ON vw.strongs_id = l.id
                     WHERE vw.verse_id = ?
                     ORDER BY vw.position ASC
                 ");
@@ -55,21 +55,22 @@ try {
                 $words = $stmtW->fetchAll(PDO::FETCH_ASSOC);
                 
                 if (!empty($words)) {
-                    $html = $v['text'];
-                    // NOTE: Robust interlinear requires word-by-word mapping. 
-                    // For now, we'll append the Strong's tags to the text as a quick fix 
-                    // or highlight specific key words if the database supports it.
-                    // Given the current structure, we'll append the tags at the end of the verse 
-                    // or use a placeholder approach if preferred.
+                    $html = "";
                     foreach($words as $w) {
-                        $tag = $w['transliteration'] ?: $w['strongs_id'];
-                        $lexType = (strpos($w['strongs_id'], 'G') === 0) ? 'strong_greek' : 'strong_hebrew';
-                        $html .= " <span class='strongs-tag' onclick=\"event.stopPropagation(); showDef('{$w['strongs_id']}', '$lexType')\">&lt;$tag&gt;</span>";
+                        $wordText = TextService::sanitizeHTML($w['word']);
+                        if ($w['strongs_id']) {
+                            $tag = $w['transliteration'] ?: $w['strongs_id'];
+                            $lexType = (strpos($w['strongs_id'], 'G') === 0) ? 'strong_greek' : 'strong_hebrew';
+                            $html .= "$wordText <span class='strongs-tag' onclick=\"event.stopPropagation(); showDef('{$w['strongs_id']}', '$lexType')\">&lt;$tag&gt;</span> ";
+                        } else {
+                            $html .= "$wordText ";
+                        }
                     }
-                    $v['text'] = $html;
+                    $v['text'] = trim($html);
                 }
+            } else {
+                $v['text'] = TextService::sanitizeHTML($v['text']);
             }
-            $v['text'] = TextService::sanitizeHTML($v['text']);
         }
         
         echo json_encode(["verses" => $verses]);
