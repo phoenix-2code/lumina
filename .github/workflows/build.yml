@@ -15,8 +15,14 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          lfs: true
+
+      - name: Unzip Databases
+        run: |
+          Expand-Archive -Path assets/data/core.db.zip -DestinationPath assets/data/ -Force
+          Expand-Archive -Path assets/data/versions.db.zip -DestinationPath assets/data/ -Force
+          Expand-Archive -Path assets/data/commentaries.db.zip -DestinationPath assets/data/ -Force
+          Expand-Archive -Path assets/data/extras.db.zip -DestinationPath assets/data/ -Force
+        shell: pwsh
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
