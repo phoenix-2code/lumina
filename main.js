@@ -12,16 +12,30 @@ const PORT = 8000;
 // In production (bundled), PHP is in resources/php/php.exe
 // Use the bundled PHP in both dev and production for consistency
 const isDev = !app.isPackaged;
-const phpExec = isDev 
-    ? path.join(__dirname, 'php', 'php.exe') 
-    : path.join(process.resourcesPath, 'php', 'php.exe');
-const webRoot = isDev ? path.join(__dirname, 'backend', 'public') : path.join(process.resourcesPath, 'backend', 'public');
-const dbPath = isDev 
-    ? path.join(__dirname, 'assets', 'data', 'core.db') 
-    : path.join(process.resourcesPath, 'assets', 'data', 'core.db');
+
+// --- PATH LOGIC ---
+const resourcesPath = isDev ? __dirname : process.resourcesPath;
+
+const phpExec = path.join(resourcesPath, 'php', 'php.exe');
+const backendRoot = path.join(resourcesPath, 'backend');
+const webRoot = path.join(backendRoot, 'public');
+const dbPath = path.join(resourcesPath, 'assets', 'data', 'core.db');
 
 function startPhpServer() {
+    const fs = require('fs');
+    if (!fs.existsSync(phpExec)) {
+        console.error(`CRITICAL ERROR: PHP not found at ${phpExec}`);
+        app.whenReady().then(() => {
+            const { dialog } = require('electron');
+            dialog.showErrorBox("Startup Error", `Required component (PHP) missing at:\n${phpExec}\n\nPlease reinstall Lumina.`);
+            app.quit();
+        });
+        return;
+    }
+
     console.log(`Starting Laravel Backend on port ${PORT}...`);
+    console.log(`PHP Exec: ${phpExec}`);
+    console.log(`Backend Root: ${backendRoot}`);
     console.log(`Web Root: ${webRoot}`);
 
     // Pass necessary env vars to Laravel
@@ -32,11 +46,13 @@ function startPhpServer() {
         DB_COMMENTARIES_PATH: dbPath.replace('core.db', 'commentaries.db'),
         DB_EXTRAS_PATH: dbPath.replace('core.db', 'extras.db'),
         APP_KEY: 'base64:ANjMFKHklakCnLbxZd89SV8lIcQfyInk6l1rZV931cI=',
-        APP_DEBUG: 'true'
+        APP_DEBUG: isDev ? 'true' : 'false',
+        APP_CONFIG_CACHE: path.join(app.getPath('userData'), 'config.php'),
+        APP_STORAGE: app.getPath('userData')
     };
     
     phpServer = spawn(phpExec, ['-S', `127.0.0.1:${PORT}`, '-t', webRoot], { 
-        cwd: path.join(__dirname, 'backend'),
+        cwd: backendRoot,
         env: env 
     });
 

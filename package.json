@@ -1,6 +1,6 @@
 {
   "name": "faithstream",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "Premium Bible Study Software",
   "main": "main.js",
   "author": {
@@ -60,6 +60,18 @@
       {
         "from": "src",
         "to": "src"
+      },
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!storage/logs/*",
+          "!storage/framework/cache/*",
+          "!storage/framework/sessions/*",
+          "!storage/framework/views/*",
+          "!.env"
+        ]
       }
     ],
     "win": {
