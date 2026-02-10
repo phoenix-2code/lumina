@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\TextService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Models\TextService; // We can move our formatter here
 
 class SearchController extends Controller
 {
@@ -20,7 +20,7 @@ class SearchController extends Controller
             return response()->json(['results' => [], 'count' => 0]);
         }
 
-        // Determine which database alias to use (KJV is in 'main', others in 'versions')
+        // Determine which database alias to use
         $dbAlias = ($version === 'KJV') ? 'main' : 'versions';
 
         // 1. Get Total Count
@@ -30,8 +30,7 @@ class SearchController extends Controller
             WHERE verses_fts MATCH ? AND version = ?
         ", [$cleanQuery, $version])->total;
 
-        // 2. Fetch Paginated Results with FTS5 Highlighting
-        // Note: We use 'core' connection because it has 'versions' ATTACHED to it.
+        // 2. Fetch Paginated Results
         $results = DB::connection('core')->select("
             SELECT 
                 b.name as book_name, 
@@ -45,13 +44,13 @@ class SearchController extends Controller
             LIMIT 200 OFFSET ?
         ", [$cleanQuery, $version, $offset]);
 
-        // 3. Format results (converting [[MARK]] to HTML)
+        // 3. Format results
         $formattedResults = collect($results)->map(function($r) {
             return [
                 'book_name' => $r->book_name,
                 'chapter' => $r->chapter,
                 'verse' => $r->verse,
-                'text' => str_replace(['[[MARK]]', '[[/MARK]]'], ['<mark>', '</mark>'], htmlspecialchars($r->text))
+                'text' => str_replace(['[[MARK]]', '[[/MARK]]'], ['<mark>', '</mark>'], TextService::sanitizeHTML($r->text))
             ];
         });
 

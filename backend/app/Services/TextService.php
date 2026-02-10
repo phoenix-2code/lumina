@@ -1,4 +1,9 @@
 <?php
+
+namespace App\Services;
+
+use App\Models\Verse;
+
 class TextService {
     /**
      * Sanitizes raw text from DB/User to prevent XSS while allowing specific study tags.
@@ -15,7 +20,7 @@ class TextService {
         
         // Remove dangerous attributes (onmouseover, etc.)
         $text = preg_replace('/on\w+="[^"]*"/i', '', $text);
-        $text = preg_replace('/on\w+=\'[^\']*\'/i', '', $text);
+        $text = preg_replace('/on\w+='[^']*'/i', '', $text);
         
         return $text;
     }
@@ -38,10 +43,10 @@ class TextService {
                 $id = ctype_digit($val) ? intval($val) : hexdec($val);
                 
                 if ($id >= 1 && $id <= 31102) {
-                    $ref = Helper::getVerseRefFromID($id);
-                    if ($ref) {
-                        $b = addslashes($ref['book']);
-                        return "<span class='ref-link' onclick='jumpTo(\"{$b}\", {$ref['chapter']}, {$ref['verse']})'>{$ref['book']} {$ref['chapter']}:{$ref['verse']}</span>";
+                    $verse = Verse::onVersion('KJV')->with('book')->find($id);
+                    if ($verse) {
+                        $bookName = addslashes($verse->book->name);
+                        return "<span class='ref-link' onclick='jumpTo("{$bookName}", {$verse->chapter}, {$verse->verse})'>{$verse->book->name} {$verse->chapter}:{$verse->verse}</span>";
                     }
                 }
                 return "[$val]";
@@ -64,10 +69,10 @@ class TextService {
                 }
 
                 if ($vid != -1) {
-                    $ref = Helper::getVerseRefFromID($vid);
-                    if ($ref) {
-                        $b = addslashes($ref['book']);
-                        $res .= "<span class='ref-link' onclick='jumpTo(\"{$b}\", {$ref['chapter']}, {$ref['verse']})'>{$ref['book']} {$ref['chapter']}:{$ref['verse']}</span> ";
+                    $verse = Verse::onVersion('KJV')->with('book')->find($vid);
+                    if ($verse) {
+                        $bookName = addslashes($verse->book->name);
+                        $res .= "<span class='ref-link' onclick='jumpTo("{$bookName}", {$verse->chapter}, {$verse->verse})'>{$verse->book->name} {$verse->chapter}:{$verse->verse}</span> ";
                         $i += $step;
                         continue;
                     }
