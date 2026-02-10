@@ -1,14 +1,23 @@
 {
-  "name": "lumina",
-  "version": "1.3.6",
+  "name": "faithstream",
+  "version": "1.3.7",
   "description": "Premium Bible Study Software",
   "main": "main.js",
+  "author": {
+    "name": "PHOENIX",
+    "email": "support@faithstream.app"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/phoenix-2code/lumina.git"
+  },
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder"
+    "build": "electron-builder",
+    "dist": "electron-builder --win --publish never",
+    "dist:publish": "electron-builder --win --publish always"
   },
-  "author": "PHOENIX",
-  "license": "MIT",
   "dependencies": {
     "electron-updater": "^6.1.7"
   },
@@ -17,47 +26,71 @@
     "electron-builder": "^24.9.1"
   },
   "build": {
-    "appId": "com.lumina.app",
+    "appId": "com.phoenix.lumina",
     "productName": "Lumina",
+    "copyright": "Copyright © 2025 PHOENIX",
+    "compression": "maximum",
+    "directories": {
+      "output": "dist"
+    },
     "files": [
       "main.js",
       "package.json",
-      "!node_modules/**/*",
-      "!**/*.map"
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/*.d.ts",
+      "!**/node_modules/.bin",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+      "!.editorconfig",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+      "!**/{appveyor.yml,.travis.yml,circle.yml}",
+      "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}"
     ],
     "extraResources": [
       {
         "from": "php",
-        "to": "php",
-        "filter": ["**/*"]
+        "to": "php"
       },
       {
         "from": "assets",
-        "to": "assets",
-        "filter": ["**/*"]
+        "to": "assets"
       },
       {
         "from": "src",
-        "to": "src",
-        "filter": ["**/*"]
-      }
-    ],
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "phoenix-2code",
-        "repo": "lumina"
+        "to": "src"
       }
     ],
     "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "${productName}-${version}-Setup.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "compressor": "lzma"
+      "allowElevation": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Lumina",
+      "differentialPackage": false
     },
-    "compression": "maximum"
+    "publish": {
+      "provider": "github",
+      "owner": "phoenix-2code",
+      "repo": "lumina",
+      "releaseType": "release"
+    }
   }
 }
