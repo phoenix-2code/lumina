@@ -54,7 +54,7 @@ try {
     assertTest("ID 31102 is Revelation 22:21", ($r2221['name'] == 'Revelation' && $r2221['chapter'] == 22 && $r2221['verse'] == 21));
 
     // 2. COMMENTARY ALIGNMENT TEST
-    $stmtComm = $db->prepare("SELECT ce.text FROM commentary_entries ce JOIN commentaries c ON ce.commentary_id = c.id WHERE c.abbreviation = 'mhc' AND ce.verse_id = ?");
+    $stmtComm = $db->prepare("SELECT ce.text FROM commentaries.commentary_entries ce JOIN commentaries.commentaries c ON ce.commentary_id = c.id WHERE c.abbreviation = 'mhc' AND ce.verse_id = ?");
     
     // Gen 1:1
     $stmtComm->execute([1]);
@@ -67,13 +67,13 @@ try {
     assertTest("MHC has correct Joseph commentary at ID 1529", (strpos($c1529, 'prolonging of Joseph') !== false));
 
     // 3. SEARCH (FTS5) TEST
-    $stmtSearch = $db->prepare("SELECT COUNT(*) FROM verses_fts WHERE verses_fts MATCH 'Abib' AND version = 'KJV'");
+    $stmtSearch = $db->prepare("SELECT COUNT(*) FROM main.verses_fts WHERE verses_fts MATCH 'Abib' AND version = 'KJV'");
     $stmtSearch->execute();
     $abibCount = $stmtSearch->fetchColumn();
     assertTest("Search for 'Abib' returns 4 results in KJV", ($abibCount == 4));
 
     // 4. CROSS-VERSION TEST
-    $stmtVer = $db->prepare("SELECT COUNT(*) FROM verses WHERE version = ?");
+    $stmtVer = $db->prepare("SELECT COUNT(*) FROM versions.verses WHERE version = ?");
     $stmtVer->execute(['NIV']);
     $nivCount = $stmtVer->fetchColumn();
     assertTest("NIV Version exists and has 31102 verses", ($nivCount == 31102));

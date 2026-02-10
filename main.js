@@ -17,8 +17,8 @@ const phpExec = isDev
     : path.join(process.resourcesPath, 'php', 'php.exe');
 const webRoot = isDev ? path.join(__dirname, 'src') : path.join(process.resourcesPath, 'src');
 const dbPath = isDev 
-    ? path.join(__dirname, 'assets', 'bible_app.db') 
-    : path.join(process.resourcesPath, 'assets', 'bible_app.db');
+    ? path.join(__dirname, 'assets', 'data', 'core.db') 
+    : path.join(process.resourcesPath, 'assets', 'data', 'core.db');
 
 function startPhpServer() {
     console.log(`Starting PHP Server on port ${PORT}...`);

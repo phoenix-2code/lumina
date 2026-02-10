@@ -1,5 +1,5 @@
 <?php
-require_once 'api/Database.php';
+require_once 'api/DatabaseManager.php';
 require_once 'api/Helper.php';
 require_once 'api/TextService.php';
 
@@ -14,7 +14,7 @@ if (isset($_SERVER['HTTP_ORIGIN']) && !in_array($_SERVER['HTTP_ORIGIN'], $allowe
 }
 
 try {
-    $db = Database::connect();
+    $db = DatabaseManager::getInstance()->getConnection();
     $action = $_GET['action'] ?? '';
 
     if (!$action) {
@@ -30,22 +30,24 @@ try {
         
         if ($chapter <= 0) throw new Exception("Invalid chapter number.");
 
-        // New Query: Includes dynamic commentary availability check (cross-version)
+        // Table source depends on version
+        $table = ($version === 'KJV') ? 'main.verses' : 'versions.verses';
+
         $stmt = $db->prepare("
             SELECT 
                 v.id, 
                 v.verse, 
                 v.text,
                 (SELECT GROUP_CONCAT(c.abbreviation) 
-                 FROM commentary_entries ce 
-                 JOIN commentaries c ON ce.commentary_id = c.id 
+                 FROM commentaries.commentary_entries ce 
+                 JOIN commentaries.commentaries c ON ce.commentary_id = c.id 
                  WHERE ce.verse_id = (
-                    SELECT v2.id FROM verses v2 
-                    WHERE v2.book_id = v.book_id AND v2.chapter = v.chapter AND v2.verse = v.verse AND v2.version = 'KJV'
+                    SELECT v2.id FROM main.verses v2 
+                    WHERE v2.book_id = v.book_id AND v2.chapter = v.chapter AND v2.verse = v.verse
                     LIMIT 1
                  )) as modules
-            FROM verses v 
-            JOIN books b ON v.book_id = b.id 
+            FROM $table v 
+            JOIN main.books b ON v.book_id = b.id 
             WHERE b.name = :book AND v.chapter = :chapter AND v.version = :version
         ");
         $stmt->execute([':book' => $book, ':chapter' => $chapter, ':version' => $version]);
@@ -55,13 +57,13 @@ try {
             throw new Exception("No verses found for '$book $chapter' ($version).");
         }
 
-        // Process interlinear/strongs from the new verse_words table if needed
+        // Process interlinear/strongs
         foreach ($verses as &$v) {
             if ($interlinear === 'true') {
                 $stmtW = $db->prepare("
                     SELECT vw.word, vw.strongs_id, l.transliteration 
-                    FROM verse_words vw
-                    LEFT JOIN lexicon l ON vw.strongs_id = l.id
+                    FROM extras.verse_words vw
+                    LEFT JOIN extras.lexicon l ON vw.strongs_id = l.id
                     WHERE vw.verse_id = ?
                     ORDER BY vw.position ASC
                 ");
@@ -100,32 +102,27 @@ try {
             throw new Exception("Invalid reference for commentary lookup.");
         }
 
-        // 1. Get the sequential ID for this verse
         $stmtId = $db->prepare("
-            SELECT v.id 
-            FROM verses v 
-            JOIN books b ON v.book_id = b.id 
-            WHERE b.name = ? AND v.chapter = ? AND v.verse = ? AND v.version = 'KJV'
+            SELECT v.id FROM main.verses v 
+            JOIN main.books b ON v.book_id = b.id 
+            WHERE b.name = ? AND v.chapter = ? AND v.verse = ?
             LIMIT 1
         ");
         $stmtId->execute([$book, $chapter, $verse]);
         $vid = $stmtId->fetchColumn();
 
-        if (!$vid) {
-            throw new Exception("Verse not found in canonical index.");
-        }
+        if (!$vid) throw new Exception("Verse not found.");
 
-        // 2. Fetch from unified commentary table
         $stmt = $db->prepare("
             SELECT ce.text
-            FROM commentary_entries ce
-            JOIN commentaries c ON ce.commentary_id = c.id
+            FROM commentaries.commentary_entries ce
+            JOIN commentaries.commentaries c ON ce.commentary_id = c.id
             WHERE c.abbreviation = ? AND ce.verse_id = ?
         ");
         $stmt->execute([$module, $vid]);
         $text = $stmt->fetchColumn();
         
-        echo json_encode(["text" => TextService::formatCommentary($text) ?: "No commentary found for this specific verse."]);
+        echo json_encode(["text" => TextService::formatCommentary($text) ?: "No commentary found."]);
 
     // --- CROSS REFS ---
     } elseif ($action == 'xrefs') {
@@ -133,12 +130,7 @@ try {
         $chapter = (int)($_GET['chapter'] ?? 0);
         $verse = (int)($_GET['verse'] ?? 0);
         
-        if (!$book || $chapter <= 0 || $verse <= 0) {
-            throw new Exception("Invalid reference for cross-reference lookup.");
-        }
-
-        // Get global ID (Always anchor to KJV for study tools)
-        $stmtId = $db->prepare("SELECT v.id FROM verses v JOIN books b ON v.book_id = b.id WHERE b.name = ? AND v.chapter = ? AND v.verse = ? AND v.version = 'KJV' LIMIT 1");
+        $stmtId = $db->prepare("SELECT v.id FROM main.verses v JOIN main.books b ON v.book_id = b.id WHERE b.name = ? AND v.chapter = ? AND v.verse = ? LIMIT 1");
         $stmtId->execute([$book, $chapter, $verse]);
         $vid = $stmtId->fetchColumn();
 
@@ -146,9 +138,9 @@ try {
 
         $stmt = $db->prepare("
             SELECT b.name as book, v.chapter, v.verse 
-            FROM cross_references xr
-            JOIN verses v ON xr.to_verse_id = v.id
-            JOIN books b ON v.book_id = b.id
+            FROM extras.cross_references xr
+            JOIN main.verses v ON xr.to_verse_id = v.id
+            JOIN main.books b ON v.book_id = b.id
             WHERE xr.from_verse_id = ?
         ");
         $stmt->execute([$vid]);
@@ -160,87 +152,59 @@ try {
         $type = $_GET['type'] ?? 'dictionary';
         $module = $_GET['module'] ?? 'EASTON';
         
-        if (!$term) throw new Exception("Missing term for definition.");
+        if (!$term) throw new Exception("Missing term.");
 
         if ($type == 'strong_hebrew' || $type == 'strong_greek') {
-            $stmt = $db->prepare("SELECT definition FROM lexicon WHERE id = ?");
+            $stmt = $db->prepare("SELECT definition FROM extras.lexicon WHERE id = ?");
             $stmt->execute([$term]);
         } else {
-            $stmt = $db->prepare("SELECT definition FROM dictionaries WHERE topic = ? AND module = ? COLLATE NOCASE");
+            $stmt = $db->prepare("SELECT definition FROM extras.dictionaries WHERE topic = ? AND module = ? COLLATE NOCASE");
             $stmt->execute([$term, strtoupper($module)]);
         }
-        $text = $stmt->fetchColumn();
-        echo json_encode(["definition" => $text ? TextService::formatCommentary($text) : "Not found."]);
-
-    // --- TOPICS ---
-    } elseif ($action == 'topics') {
-        $m = strtoupper($_GET['module'] ?? 'EASTON');
-        if ($m == 'HEBREW' || $m == 'GREEK') {
-            $stmt = $db->query("SELECT id, transliteration FROM lexicon WHERE id LIKE '".($m=='HEBREW'?'H':'G')."%' ORDER BY length(id), id");
-            $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            $formatted = [];
-            foreach($results as $r) {
-                $label = $r['id'] . ($r['transliteration'] ? " - " . $r['transliteration'] : "");
-                $formatted[] = ["id" => $r['id'], "label" => $label];
-            }
-            echo json_encode(["topics" => $formatted]);
-        } else {
-            $stmt = $db->prepare("SELECT topic FROM dictionaries WHERE module = ? ORDER BY topic ASC");
-            $stmt->execute([$m]);
-            $topics = $stmt->fetchAll(PDO::FETCH_COLUMN);
-            $formatted = [];
-            foreach($topics as $t) $formatted[] = ["id" => $t, "label" => $t];
-            echo json_encode(["topics" => $formatted]);
-        }
+        echo json_encode(["definition" => $stmt->fetchColumn() ? TextService::formatCommentary($stmt->fetchColumn()) : "Not found."]);
 
     // --- LISTS ---
     } elseif ($action == 'version_list') {
-        echo json_encode(["versions" => $db->query("SELECT DISTINCT version FROM verses ORDER BY version")->fetchAll(PDO::FETCH_COLUMN)]);
+        $v1 = $db->query("SELECT DISTINCT version FROM main.verses")->fetchAll(PDO::FETCH_COLUMN);
+        $v2 = $db->query("SELECT DISTINCT version FROM versions.verses")->fetchAll(PDO::FETCH_COLUMN);
+        echo json_encode(["versions" => array_merge($v1, $v2)]);
 
     } elseif ($action == 'commentary_list') {
-        $mods = $db->query("SELECT abbreviation FROM commentaries ORDER BY abbreviation")->fetchAll(PDO::FETCH_COLUMN);
+        $mods = $db->query("SELECT abbreviation FROM commentaries.commentaries ORDER BY abbreviation")->fetchAll(PDO::FETCH_COLUMN);
         echo json_encode(["modules" => array_map('strtoupper', $mods)]);
 
     // --- SEARCH ---
     } elseif ($action == 'search') {
+        // Search remains on core for now, or we'd need to re-index.
+        // For v1.3.0, we'll keep the monolithic FTS or split it.
+        // Assuming search is in main for KJV and versions for others.
+        // This part needs careful handling of FTS across attached DBs.
         $q = $_GET['q'] ?? '';
         $version = $_GET['version'] ?? 'KJV';
-        $scope = $_GET['scope'] ?? 'ALL';
-        $offset = (int)($_GET['offset'] ?? 0);
+        $dbAlias = ($version === 'KJV') ? 'main' : 'versions';
         
         $clean = preg_replace('/[^a-zA-Z0-9 ]/', '', $q);
         if (!$clean) { echo json_encode(["results" => [], "count" => 0]); exit; }
 
-        $scopeSql = ""; $params = [':q' => $clean, ':v' => $version];
-        if ($scope == 'OT') $scopeSql = "AND book_id <= 39";
-        elseif ($scope == 'NT') $scopeSql = "AND book_id >= 40";
-        elseif ($scope != 'ALL') {
-            $bid = $db->prepare("SELECT id FROM books WHERE name = ?"); $bid->execute([$scope]);
-            $bid_val = $bid->fetchColumn();
-            if ($bid_val) { $scopeSql = "AND book_id = :bid"; $params[':bid'] = $bid_val; }
-        }
-
-        $count = $db->prepare("SELECT COUNT(*) FROM verses_fts WHERE verses_fts MATCH :q AND version = :v $scopeSql");
-        $count->execute($params);
+        // FTS must be in the same DB as the verses.
+        $count = $db->prepare("SELECT COUNT(*) FROM $dbAlias.verses_fts WHERE verses_fts MATCH :q AND version = :v");
+        $count->execute([':q' => $clean, ':v' => $version]);
         $total = $count->fetchColumn();
 
         $stmt = $db->prepare("
-            SELECT b.name as book_name, v.chapter, v.verse, highlight(verses_fts, 0, '[[MARK]]', '[[/MARK]]') as text 
-            FROM verses_fts v 
-            JOIN books b ON v.book_id = b.id 
-            WHERE verses_fts MATCH :q AND version = :v $scopeSql 
-            ORDER BY v.book_id, v.chapter, v.verse 
-            LIMIT 200 OFFSET $offset
-        ");
-        $stmt->execute($params);
+            SELECT b.name as book_name, v.chapter, v.verse, highlight($dbAlias.verses_fts, 0, '[[MARK]]', '[[/MARK]]') as text 
+            FROM $dbAlias.verses_fts v 
+            JOIN main.books b ON v.book_id = b.id 
+            WHERE v.verses_fts MATCH :q AND v.version = :v 
+            LIMIT 200 OFFSET " . (int)($_GET['offset'] ?? 0)
+        );
+        $stmt->execute([':q' => $clean, ':v' => $version]);
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         foreach ($results as &$r) {
             $r['text'] = TextService::sanitizeHTML($r['text']);
-            $r['text'] = str_replace('[[MARK]]', '<mark>', $r['text']);
-            $r['text'] = str_replace('[[/MARK]]', '</mark>', $r['text']);
+            $r['text'] = str_replace(['[[MARK]]', '[[/MARK]]'], ['<mark>', '</mark>'], $r['text']);
         }
-        
         echo json_encode(["results" => $results, "count" => $total]);
     } else {
         throw new Exception("Unknown action: $action");

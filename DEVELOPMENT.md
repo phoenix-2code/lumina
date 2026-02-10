@@ -2,7 +2,11 @@
 
 ## Current Status
 - **Rebrand complete**: Lumina (Orange Theme)
-- **Data Architecture**: Sequential IDs (1-31102) aligned across all study tools.
+- **Data Architecture**: Split Database (Modular) architecture implemented.
+  - `core.db`: Books, KJV, and canonical structure.
+  - `versions.db`: All other translations.
+  - `commentaries.db`: Unified commentary modules.
+  - `extras.db`: Lexicon, Dictionaries, Cross-references.
 - **Search**: FTS5 implemented for all versions.
 - **Interlinear**: Restored word-by-word integrated view.
 - **Stability**: Automated API verification test suite implemented (`tests/api_verification.php`).
