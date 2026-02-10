@@ -194,18 +194,18 @@ function updatePaneContent(paneId) {
             return;
         }
         
-        fetch(`api.php?action=search&q=${encodeURIComponent(state.searchQuery)}&version=${state.version}&scope=${encodeURIComponent(state.searchScope)}`)
+        fetch(`api.php?action=search&q=${encodeURIComponent(state.searchQuery)}&version=${state.version}&scope=${encodeURIComponent(state.searchScope)}&offset=${state.searchOffset}`)
             .then(r => r.json())
             .then(data => {
-                document.getElementById(`${paneId}-title`).innerText = `Search: ${state.searchQuery} (${data.count})`;
-                let html = `<div style="padding:15px;">`;
-                if (data.count > 200) html += `<div style="padding:8px 15px; font-size:11px; color:var(--text-muted); background:var(--bg-app); border-bottom:1px solid var(--border); margin-bottom:15px;">Showing first 200 of ${data.count} results</div>`;
+                const currentShowing = Math.min(state.searchOffset + 200, data.count);
+                document.getElementById(`${paneId}-title`).innerText = `Search: ${state.searchQuery} (${currentShowing} of ${data.count})`;
                 
+                let resultsHtml = "";
                 if(!data.results || data.results.length === 0) {
-                    html += "No matches found.";
+                    resultsHtml = "No matches found.";
                 } else {
                     data.results.forEach(r => {
-                        html += `<div class="comm-card" style="cursor:pointer; margin-top:10px;" 
+                        resultsHtml += `<div class="comm-card" style="cursor:pointer; margin-top:10px;" 
                                      onclick="jumpTo('${r.book_name.replace(/'/g, "\'")}', ${r.chapter}, ${r.verse})"
                                      onmouseover="this.style.borderColor='var(--accent)'" 
                                      onmouseout="this.style.borderColor='var(--border)'">
@@ -216,9 +216,33 @@ function updatePaneContent(paneId) {
                                  </div>`;
                     });
                 }
-                contentDiv.innerHTML = html + `</div>`;
+
+                if (state.searchOffset === 0) {
+                    let wrapper = `<div style="padding:15px;" id="search-results-list">${resultsHtml}</div>`;
+                    if (data.count > 200) {
+                        wrapper += `<div id="search-load-more-container" style="padding:20px; text-align:center;">
+                                        <button onclick="loadMoreResults('${paneId}')" class="primary" style="padding:8px 20px;">Load More Results</button>
+                                    </div>`;
+                    }
+                    contentDiv.innerHTML = wrapper;
+                } else {
+                    const list = document.getElementById('search-results-list');
+                    if (list) list.innerHTML += resultsHtml;
+                    
+                    const loadMoreContainer = document.getElementById('search-load-more-container');
+                    if (loadMoreContainer) {
+                        if (currentShowing >= data.count) {
+                            loadMoreContainer.style.display = 'none';
+                        }
+                    }
+                }
             });
     }
+}
+
+function loadMoreResults(paneId) {
+    state.searchOffset += 200;
+    updatePaneContent(paneId);
 }
 
 function renderCommentary(container, text) {

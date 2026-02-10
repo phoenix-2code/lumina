@@ -181,6 +181,7 @@ try {
         $q = $_GET['q'] ?? '';
         $version = $_GET['version'] ?? 'KJV';
         $scope = $_GET['scope'] ?? 'ALL';
+        $offset = (int)($_GET['offset'] ?? 0);
         
         $clean = preg_replace('/[^a-zA-Z0-9 ]/', '', $q);
         if (!$clean) { echo json_encode(["results" => [], "count" => 0]); exit; }
@@ -204,7 +205,7 @@ try {
             JOIN books b ON v.book_id = b.id 
             WHERE verses_fts MATCH :q AND version = :v $scopeSql 
             ORDER BY v.book_id, v.chapter, v.verse 
-            LIMIT 200
+            LIMIT 200 OFFSET $offset
         ");
         $stmt->execute($params);
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);

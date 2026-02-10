@@ -9,6 +9,7 @@ const state = {
     lexModule: "HEBREW",
     searchQuery: "",
     searchScope: "ALL",
+    searchOffset: 0,
     lookupTerm: "",
     lookupType: "dictionary",
     interlinear: false,

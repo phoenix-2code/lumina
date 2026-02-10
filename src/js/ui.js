@@ -262,6 +262,7 @@ function searchLex() {
 
 function searchBible() {
     state.searchQuery = document.getElementById('inp-bible-search').value;
+    state.searchOffset = 0;
     
     // Secret Debug Trigger
     if (state.searchQuery === 'DEBUG') {
