@@ -1,30 +1,30 @@
 :root {
-    /* Light Theme */
-    --bg-app: #f3f4f6;
+    /* Light Theme - Lumina Rebrand */
+    --bg-app: #f8fafc;
     --bg-panel: #ffffff;
     --bg-ribbon: #ffffff;
-    --text-main: #1f2937;
-    --text-muted: #6b7280;
-    --border: #e5e7eb;
-    --accent: #2563eb;
-    --accent-hover: #1d4ed8;
-    --highlight: #eff6ff;
-    --verse-num: #d97706;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+    --accent: #FF6B00; /* Lumina Orange */
+    --accent-hover: #E65100;
+    --highlight: #FFF3E0;
+    --verse-num: #F57C00;
     --shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 [data-theme="dark"] {
     /* Dark Theme */
-    --bg-app: #111827;
-    --bg-panel: #1f2937;
-    --bg-ribbon: #1f2937;
-    --text-main: #f3f4f6;
-    --text-muted: #9ca3af;
-    --border: #374151;
-    --accent: #3b82f6;
-    --accent-hover: #60a5fa;
-    --highlight: #374151;
-    --verse-num: #f59e0b;
+    --bg-app: #0f172a;
+    --bg-panel: #1e293b;
+    --bg-ribbon: #1e293b;
+    --text-main: #f1f5f9;
+    --text-muted: #94a3b8;
+    --border: #334155;
+    --accent: #FF8533; /* Brighter orange for dark mode visibility */
+    --accent-hover: #FFA366;
+    --highlight: #334155;
+    --verse-num: #fbbf24;
     --shadow: 0 4px 6px rgba(0,0,0,0.3);
 }
 
@@ -161,7 +161,7 @@ body {
 
 .pane-header {
     flex: 0 0 40px;
-    background: #2563eb; 
+    background: var(--accent); 
     color: white;
     padding: 0 12px; 
     font-size: 13px; 

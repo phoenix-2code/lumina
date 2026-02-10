@@ -49,7 +49,7 @@ function startPhpServer() {
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1280, height: 800,
-        title: "FaithStream",
+        title: "Lumina",
         webPreferences: {
             nodeIntegration: true, // Needed for IPC communication for updates
             contextIsolation: false
