@@ -2,7 +2,32 @@
 
 window.onload = function() {
     console.log("Bible App Initializing...");
+    
+    const statusOverlay = document.createElement('div');
+    statusOverlay.id = 'boot-overlay';
+    statusOverlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg-app); z-index:99999; display:flex; flex-direction:column; justify-content:center; align-items:center;';
+    statusOverlay.innerHTML = '<h2 style="color:var(--accent)">Lumina</h2><p id="boot-msg">Starting engine...</p><div class="loader"></div>';
+    document.body.appendChild(statusOverlay);
 
+    // 1. Wait for Heartbeat
+    const checkServer = () => {
+        fetch(API_BASE + '/up')
+            .then(r => {
+                if (r.ok) {
+                    statusOverlay.style.display = 'none';
+                    startAppLogic();
+                } else {
+                    throw new Error();
+                }
+            })
+            .catch(() => {
+                setTimeout(checkServer, 1000);
+            });
+    };
+    checkServer();
+};
+
+function startAppLogic() {
     // 1. Load Theme & Settings
     const savedTheme = localStorage.getItem('theme') || 'light';
     document.body.setAttribute('data-theme', savedTheme);
@@ -24,7 +49,6 @@ window.onload = function() {
             if (p.minimized) el.classList.add('minimized');
             if (p.maximized) el.classList.add('maximized');
             if (p.closed) el.classList.add('closed');
-            // We'll set the type in step 5
         });
     }
 
@@ -142,7 +166,6 @@ window.onload = function() {
     // 5. Initial Load
     if(typeof updateVerseSelector === 'function') updateVerseSelector(); 
     
-    // Update selectors to match state
     const selBook = document.getElementById('sel-book');
     const inpChapter = document.getElementById('inp-chapter');
     if (selBook) selBook.value = state.book;
@@ -153,11 +176,10 @@ window.onload = function() {
             changePaneContent(id, state.layout.panes[id].type);
         });
         
-        // Init History
         if(state.history) {
             state.history.push({ book: state.book, chapter: state.chapter, verse: state.verse });
             state.historyIndex = 0;
             if(typeof updateHistoryButtons === 'function') updateHistoryButtons();
         }
     }
-};
+}

@@ -202,6 +202,19 @@ async function ensureDatabases() {
 async function startPhpServer() {
     await ensureDatabases();
 
+    // FINAL CONNECTIVITY TEST
+    log('[DATABASE] Testing connectivity...');
+    try {
+        const sqlite3 = require('sqlite3').verbose();
+        const testDb = new sqlite3.Database(path.join(appDbDir, DATABASES.core.fileName), sqlite3.OPEN_READONLY, (err) => {
+            if (err) log(`[DATABASE] ✗ Connectivity Test Failed: ${err.message}`);
+            else log('[DATABASE] ✓ Connectivity Test Passed');
+        });
+        testDb.close();
+    } catch (e) {
+        log(`[DATABASE] ✗ Test script failed: ${e.message}`);
+    }
+
     if (!fs.existsSync(phpExec)) {
         log(`[PHP] ✗ Executable missing: ${phpExec}`);
         dialog.showErrorBox("Startup Error", `PHP missing at: ${phpExec}`);
@@ -218,11 +231,23 @@ async function startPhpServer() {
         DB_EXTRAS_PATH: path.join(appDbDir, DATABASES.extras.fileName),
         APP_KEY: 'base64:ANjMFKHklakCnLbxZd89SV8lIcQfyInk6l1rZV931cI=',
         APP_DEBUG: isDev ? 'true' : 'false',
-        APP_STORAGE: userDataPath
+        APP_STORAGE: userDataPath,
+        VIEW_COMPILED_PATH: path.join(userDataPath, 'storage', 'framework', 'views')
     };
     
     phpServer = spawn(phpExec, ['-S', `127.0.0.1:${PORT}`, '-t', webRoot], { cwd: backendRoot, env: env });
+    
+    phpServer.stdout.on('data', (data) => {
+        log(`[PHP STDOUT] ${data.toString().trim()}`);
+    });
+
+    phpServer.stderr.on('data', (data) => {
+        log(`[PHP STDERR] ${data.toString().trim()}`);
+    });
+
     phpServer.on('error', (err) => log(`[PHP] ✗ Process error: ${err.message}`));
+    phpServer.on('close', (code) => log(`[PHP] Server exited with code ${code}`));
+    
     log('[PHP] ✓ Server process spawned');
 }
 
