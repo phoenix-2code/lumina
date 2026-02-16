@@ -43,11 +43,11 @@ jobs:
 
       - name: Bundle PHP for Electron
         run: |
-          mkdir -p php
-          cp "$(which php)" php/php.exe
-          # Note: This is a simplified example; real PHP bundling usually requires 
-          # copying the whole PHP directory. For now, we'll try to ensure the folder exists.
-        shell: bash
+          $phpPath = (Get-Command php).Source
+          $phpDir = Split-Path $phpPath
+          mkdir php -Force
+          Copy-Item -Path "$phpDir\*" -Destination "php\" -Recurse -Force
+        shell: pwsh
 
       - name: Build & Publish
         run: npm run dist:publish

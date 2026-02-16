@@ -5,6 +5,10 @@ use App\Http\Controllers\StudyController;
 use App\Http\Controllers\SearchController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/up', function() {
+    return response()->json(['status' => 'ok']);
+});
+
 Route::get('/bible/chapter', [BibleController::class, 'getChapter']);
 Route::get('/bible/versions', [BibleController::class, 'getVersions']);
 
