@@ -140,167 +140,76 @@ async function downloadDatabase(url, destPath, isCompressed, onProgress, retryCo
     });
 }
 
+// --- LOGGING ---
+const logFile = path.join(userDataPath, 'startup.log');
+function log(msg) {
+    const timestamp = new Date().toISOString();
+    const entry = `[${timestamp}] ${msg}\n`;
+    console.log(msg);
+    try {
+        if (!fs.existsSync(path.dirname(logFile))) fs.mkdirSync(path.dirname(logFile), { recursive: true });
+        fs.appendFileSync(logFile, entry);
+    } catch (e) {}
+}
+
 /**
  * Ensure all databases exist before starting the app
  */
 async function ensureDatabases() {
-    console.log('[DATABASE] Checking databases...');
+    log('[DATABASE] Checking databases...');
     
-    // 1. Create main user data directory if it doesn't exist
-    if (!fs.existsSync(userDataPath)) {
-        fs.mkdirSync(userDataPath, { recursive: true });
-        console.log(`[DATABASE] Created user data directory: ${userDataPath}`);
-    }
-
-    // 2. Create database directory
     if (!fs.existsSync(appDbDir)) {
         fs.mkdirSync(appDbDir, { recursive: true });
-        console.log(`[DATABASE] Created directory: ${appDbDir}`);
+        log(`[DATABASE] Created directory: ${appDbDir}`);
     }
 
-    // Process each database
     for (const [key, config] of Object.entries(DATABASES)) {
         const dbFilePath = path.join(appDbDir, config.fileName);
         
-        // Skip if already exists
         if (fs.existsSync(dbFilePath)) {
-            const sizeMB = (fs.statSync(dbFilePath).size / 1024 / 1024).toFixed(2);
-            console.log(`[DATABASE] ✓ ${config.fileName} exists (${sizeMB} MB)`);
+            log(`[DATABASE] ✓ ${config.fileName} exists`);
             continue;
         }
 
         try {
             if (config.bundled) {
-                // Copy from bundled resources
-                // In dev, use assets/data. In prod, use databases folder (as defined in package.json extraResources)
                 const sourceDir = isDev ? path.join(resourcesPath, 'assets', 'data') : path.join(resourcesPath, 'databases');
                 const sourcePath = path.join(sourceDir, config.fileName);
-                console.log(`[DATABASE] Copying bundled: ${config.fileName}`);
-                console.log(`[DATABASE] Source: ${sourcePath}`);
+                log(`[DATABASE] Copying bundled: ${config.fileName} from ${sourcePath}`);
                 
-                if (!fs.existsSync(sourcePath)) {
-                    throw new Error(`Bundled database not found: ${sourcePath}`);
-                }
-                
+                if (!fs.existsSync(sourcePath)) throw new Error(`Bundled source missing: ${sourcePath}`);
                 fs.copyFileSync(sourcePath, dbFilePath);
-                const sizeMB = (fs.statSync(dbFilePath).size / 1024 / 1024).toFixed(2);
-                console.log(`[DATABASE] ✓ Copied ${config.fileName} (${sizeMB} MB)`);
-                
             } else {
-                // Download from internet
-                console.log(`[DATABASE] Downloading: ${config.fileName}`);
+                log(`[DATABASE] Downloading: ${config.fileName}`);
+                if (mainWindow) mainWindow.webContents.send('download-status', { database: config.fileName, status: 'downloading' });
                 
-                // Notify UI
-                if (mainWindow && mainWindow.webContents) {
-                    mainWindow.webContents.send('download-status', {
-                        database: config.fileName,
-                        status: 'downloading',
-                        progress: 0
-                    });
-                }
-                
-                await downloadDatabase(
-                    config.url, 
-                    dbFilePath, 
-                    config.compressed, 
-                    (received, total, progress) => {
-                        // Update UI with progress
-                        if (mainWindow && mainWindow.webContents) {
-                            mainWindow.webContents.send('download-progress', {
-                                database: config.fileName,
-                                received: received,
-                                total: total,
-                                progress: progress.toFixed(1)
-                            });
-                        }
-                        
-                        // Log progress every 10%
-                        if (Math.floor(progress) % 10 === 0) {
-                            console.log(`[DATABASE] ${config.fileName}: ${progress.toFixed(1)}%`);
-                        }
-                    }
-                );
-                
-                // Notify UI of completion
-                if (mainWindow && mainWindow.webContents) {
-                    mainWindow.webContents.send('download-status', {
-                        database: config.fileName,
-                        status: 'complete'
-                    });
-                }
-                
-                const sizeMB = (fs.statSync(dbFilePath).size / 1024 / 1024).toFixed(2);
-                console.log(`[DATABASE] ✓ Downloaded ${config.fileName} (${sizeMB} MB)`);
+                await downloadDatabase(config.url, dbFilePath, config.compressed, (received, total, progress) => {
+                    if (mainWindow) mainWindow.webContents.send('download-progress', { database: config.fileName, progress: progress.toFixed(1) });
+                });
+                if (mainWindow) mainWindow.webContents.send('download-status', { database: config.fileName, status: 'complete' });
             }
         } catch (error) {
-            console.error(`[DATABASE] ✗ Failed to prepare ${config.fileName}:`, error);
-            
-            // Show error dialog
-            dialog.showErrorBox(
-                "Database Error", 
-                `Failed to prepare database: ${config.fileName}\n\n${error.message}\n\nPlease check your internet connection and try again.`
-            );
-            
-            // Clean up partial downloads
-            if (fs.existsSync(dbFilePath)) {
-                fs.unlinkSync(dbFilePath);
-            }
-            if (fs.existsSync(dbFilePath + '.zip')) {
-                fs.unlinkSync(dbFilePath + '.zip');
-            }
-            
+            log(`[DATABASE] ✗ Error: ${error.message}`);
+            dialog.showErrorBox("Database Error", `Failed to prepare ${config.fileName}: ${error.message}`);
             throw error;
         }
     }
-
-    console.log('[DATABASE] ✓ All databases ready');
 }
 
 /**
  * Start PHP Laravel backend server
  */
 async function startPhpServer() {
-    // Ensure Laravel storage directories exist in userData
-    const storageDirs = [
-        path.join(userDataPath, 'storage', 'logs'),
-        path.join(userDataPath, 'storage', 'framework', 'views'),
-        path.join(userDataPath, 'storage', 'framework', 'sessions'),
-        path.join(userDataPath, 'storage', 'framework', 'cache')
-    ];
-    
-    storageDirs.forEach(dir => {
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-            console.log(`[PHP] Created storage directory: ${dir}`);
-        }
-    });
+    await ensureDatabases();
 
-    // Wait for databases to be ready
-    try {
-        await ensureDatabases();
-    } catch (error) {
-        console.error('[PHP] Cannot start - database setup failed');
-        app.quit();
-        return;
-    }
-
-    // Verify PHP exists
     if (!fs.existsSync(phpExec)) {
-        console.error(`[PHP] ✗ PHP not found: ${phpExec}`);
-        dialog.showErrorBox(
-            "Startup Error", 
-            `Required component (PHP) missing at:\n${phpExec}\n\nPlease reinstall Lumina.`
-        );
+        log(`[PHP] ✗ Executable missing: ${phpExec}`);
+        dialog.showErrorBox("Startup Error", `PHP missing at: ${phpExec}`);
         app.quit();
         return;
     }
 
-    console.log(`[PHP] Starting Laravel backend on port ${PORT}...`);
-    console.log(`[PHP] Executable: ${phpExec}`);
-    console.log(`[PHP] Backend root: ${backendRoot}`);
-    console.log(`[PHP] Web root: ${webRoot}`);
-
-    // Environment variables for Laravel
+    log(`[PHP] Starting on port ${PORT}...`);
     const env = { 
         ...process.env, 
         DB_CORE_PATH: path.join(appDbDir, DATABASES.core.fileName),
@@ -309,123 +218,45 @@ async function startPhpServer() {
         DB_EXTRAS_PATH: path.join(appDbDir, DATABASES.extras.fileName),
         APP_KEY: 'base64:ANjMFKHklakCnLbxZd89SV8lIcQfyInk6l1rZV931cI=',
         APP_DEBUG: isDev ? 'true' : 'false',
-        APP_CONFIG_CACHE: path.join(userDataPath, 'config.php'),
         APP_STORAGE: userDataPath
     };
     
-    // Start PHP server
-    phpServer = spawn(phpExec, ['-S', `127.0.0.1:${PORT}`, '-t', webRoot], { 
-        cwd: backendRoot,
-        env: env 
-    });
-
-    phpServer.stdout.on('data', (data) => {
-        console.log(`[PHP] ${data.toString().trim()}`);
-    });
-    
-    phpServer.stderr.on('data', (data) => {
-        const msg = data.toString();
-        // Filter out noisy access logs
-        if (!msg.includes('Accepted') && 
-            !msg.includes('Closing') && 
-            !msg.includes('[200]:') &&
-            !msg.includes('Development Server')) {
-            console.error(`[PHP] ${msg.trim()}`);
-        }
-    });
-    
-    phpServer.on('close', (code) => {
-        console.log(`[PHP] Server exited with code ${code}`);
-    });
-    
-    phpServer.on('error', (error) => {
-        console.error(`[PHP] Failed to start:`, error);
-    });
-    
-    console.log('[PHP] ✓ Server started');
+    phpServer = spawn(phpExec, ['-S', `127.0.0.1:${PORT}`, '-t', webRoot], { cwd: backendRoot, env: env });
+    phpServer.on('error', (err) => log(`[PHP] ✗ Process error: ${err.message}`));
+    log('[PHP] ✓ Server process spawned');
 }
 
 /**
  * Create main application window
  */
 function createWindow() {
-    console.log('[WINDOW] Creating main window...');
-    
+    log('[WINDOW] Creating window...');
     mainWindow = new BrowserWindow({
-        width: 1280, 
-        height: 800,
+        width: 1280, height: 800,
         title: "Lumina",
-        webPreferences: {
-            nodeIntegration: true, 
-            contextIsolation: false
-        },
+        webPreferences: { nodeIntegration: true, contextIsolation: false },
         autoHideMenuBar: true,
-        show: false // Don't show until ready
+        show: false
     });
 
-    // Load frontend
     mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
-    
-    // Show window when ready
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
-        console.log('[WINDOW] ✓ Window shown');
+        log('[WINDOW] ✓ Window visible');
     });
-    
-    // Check for updates (production only)
-    if (!isDev) {
-        setTimeout(() => {
-            autoUpdater.checkForUpdatesAndNotify();
-        }, 5000); // Wait 5 seconds before checking
-    }
-    
-    console.log('[WINDOW] ✓ Window created');
 }
 
-// --- AUTO-UPDATER EVENTS ---
-autoUpdater.on('update-available', (info) => {
-    console.log('[UPDATER] Update available:', info.version);
-    if (mainWindow && mainWindow.webContents) {
-        mainWindow.webContents.send('update_available', info);
-    }
-});
-
-autoUpdater.on('update-downloaded', (info) => {
-    console.log('[UPDATER] Update downloaded:', info.version);
-    if (mainWindow && mainWindow.webContents) {
-        mainWindow.webContents.send('update_downloaded', info);
-    }
-});
-
-autoUpdater.on('error', (error) => {
-    console.error('[UPDATER] Error:', error);
-});
-
-ipcMain.on('restart_app', () => {
-    console.log('[UPDATER] Restarting to install update...');
-    autoUpdater.quitAndInstall();
-});
-
 // --- APP LIFECYCLE ---
-app.on('ready', async () => {
-    console.log('[APP] Starting Lumina v1.5.6...');
-    console.log('[APP] Mode:', isDev ? 'DEVELOPMENT' : 'PRODUCTION');
-    console.log('[APP] Resources:', resourcesPath);
-    console.log('[APP] User data:', userDataPath);
-    console.log('[APP] DB Directory:', appDbDir);
+app.on('ready', () => {
+    log('--- App Starting v1.5.7 ---');
     
-    // 1. First ensure databases are ready
-    try {
-        // We call startPhpServer which internally calls ensureDatabases
-        await startPhpServer();
-    } catch (startupError) {
-        console.error('[APP] Startup failed:', startupError);
-        // Error dialog is shown inside startPhpServer/ensureDatabases
-        return;
-    }
-
-    // 2. Finally create the window
+    // 1. Show window IMMEDIATELY so user sees progress
     createWindow();
+    
+    // 2. Start initialization in the background
+    startPhpServer().catch(err => {
+        log(`[APP] CRITICAL STARTUP FAILURE: ${err.message}`);
+    });
 });
 
 app.on('window-all-closed', () => {
