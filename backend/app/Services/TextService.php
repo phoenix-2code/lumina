@@ -20,7 +20,7 @@ class TextService {
         
         // Remove dangerous attributes (onmouseover, etc.)
         $text = preg_replace('/on\w+="[^"]*"/i', '', $text);
-        $text = preg_replace('/on\w+='[^']*'/i', '', $text);
+        $text = preg_replace("/on\w+='[^']*'/i", '', $text);
         
         return $text;
     }
@@ -28,59 +28,27 @@ class TextService {
     public static function formatCommentary($text) {
         if (!$text) return "";
         
-        // 1. Sanitize input first
+        // 1. Sanitize input
         $text = self::sanitizeHTML($text);
         
-        // 2. Strip legacy control characters (non-printable binary junk)
+        // 2. Strip control characters
         $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $text);
 
-        // 3. Atomic Replacement: Match EITHER Chevrons OR Hex Strings
-        return preg_replace_callback('/(»([0-9A-F]+)«)|([0-9A-F]{3,})/', function($matches) {
+        // 3. Simple Reference Replacement (matches »123« or hex »A1B«)
+        $text = preg_replace_callback('/»([0-9A-Fa-f]+)«/', function($matches) {
+            $val = $matches[1];
+            $id = ctype_digit($val) ? intval($val) : hexdec($val);
             
-            // CASE A: Chevron Match
-            if (!empty($matches[1])) {
-                $val = $matches[2];
-                $id = ctype_digit($val) ? intval($val) : hexdec($val);
-                
-                if ($id >= 1 && $id <= 31102) {
-                    $verse = Verse::onVersion('KJV')->with('book')->find($id);
-                    if ($verse) {
-                        $bookName = addslashes($verse->book->name);
-                        return "<span class='ref-link' onclick='jumpTo("{$bookName}", {$verse->chapter}, {$verse->verse})'>{$verse->book->name} {$verse->chapter}:{$verse->verse}</span>";
-                    }
+            if ($id >= 1 && $id <= 31102) {
+                $verse = Verse::onVersion('KJV')->with('book')->find($id);
+                if ($verse) {
+                    $bookName = addslashes($verse->book->name);
+                    return "<span class='ref-link' onclick=\"jumpTo('{$bookName}', {$verse->chapter}, {$verse->verse})\">{$verse->book->name} {$verse->chapter}:{$verse->verse}</span>";
                 }
-                return "[$val]";
             }
-            
-            // CASE B: Hex Block
-            $raw = $matches[0];
-            if (in_array($raw, ['THE', 'AND', 'GOD', 'BAD', 'DAD', 'FADE', 'FEED', 'FACE', 'DEAD', 'BED', 'BEEF', 'ACE', 'ADD'])) return $raw;
-
-            $res = ""; $i = 0; $len = strlen($raw);
-            while ($i < $len) {
-                $vid = -1; $step = 1;
-                if ($i + 4 <= $len) {
-                    $v = hexdec(substr($raw, $i, 4));
-                    if ($v >= 1 && $v <= 31102) { $vid = $v; $step = 4; }
-                }
-                if ($vid == -1 && $i + 3 <= $len) {
-                    $v = hexdec(substr($raw, $i, 3));
-                    if ($v >= 1 && $v <= 31102) { $vid = $v; $step = 3; }
-                }
-
-                if ($vid != -1) {
-                    $verse = Verse::onVersion('KJV')->with('book')->find($vid);
-                    if ($verse) {
-                        $bookName = addslashes($verse->book->name);
-                        $res .= "<span class='ref-link' onclick='jumpTo("{$bookName}", {$verse->chapter}, {$verse->verse})'>{$verse->book->name} {$verse->chapter}:{$verse->verse}</span> ";
-                        $i += $step;
-                        continue;
-                    }
-                }
-                $res .= $raw[$i];
-                $i++;
-            }
-            return $res;
+            return "[$val]";
         }, $text);
+
+        return $text;
     }
 }

@@ -39,64 +39,81 @@ window.onload = function() {
     }
 
     // 2. Populate Bible Versions
-    fetch('api/bible/versions')
-        .then(r => r.json())
-        .then(data => {
-            const sel = document.getElementById('sel-version');
-            if(sel) {
-                sel.innerHTML = ''; 
-                data.versions.forEach(v => {
-                    const opt = document.createElement('option');
-                    opt.value = v;
-                    opt.text = versionNames[v] || v; 
-                    if(v === state.version) opt.selected = true;
-                    sel.appendChild(opt);
-                });
-            }
-        })
-        .catch(e => console.error("Error loading versions:", e));
+    const populateVersions = (retryCount = 0) => {
+        fetch(API_BASE + '/api/bible/versions')
+            .then(r => r.json())
+            .then(data => {
+                const sel = document.getElementById('sel-version');
+                if(sel && data.versions) {
+                    sel.innerHTML = ''; 
+                    data.versions.forEach(v => {
+                        const opt = document.createElement('option');
+                        opt.value = v;
+                        opt.text = versionNames[v] || v; 
+                        if(v === state.version) opt.selected = true;
+                        sel.appendChild(opt);
+                    });
+                }
+            })
+            .catch(e => {
+                console.error("Error loading versions:", e);
+                if (retryCount < 5) {
+                    setTimeout(() => populateVersions(retryCount + 1), 500);
+                }
+            });
+    };
+    populateVersions();
 
     // 3. Populate Commentaries
-    fetch('api/study/commentary-list')
-        .then(r => r.json())
-        .then(data => {
-            const container = document.querySelector('#tab-comm .ribbon-group > div');
-            if(container) {
-                container.style.display = 'grid'; 
-                container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(220px, 1fr))'; 
-                container.style.gap = '8px'; 
-                container.style.width = '100%';
-                
-                container.innerHTML = ''; 
-                data.modules.forEach(mod => {
-                    const btn = document.createElement('div');
-                    btn.className = 'module-card';
-                    btn.style.cssText = "background:var(--bg-panel); border:1px solid var(--border); padding:8px 12px; border-radius:4px; cursor:pointer; font-size:12px; display:flex; align-items:center; min-height:30px;";
+    const populateCommentaries = (retryCount = 0) => {
+        fetch(API_BASE + '/api/study/commentary-list')
+            .then(r => r.json())
+            .then(data => {
+                const container = document.querySelector('#tab-comm .ribbon-group > div');
+                if(container && data.modules) {
+                    container.style.display = 'grid'; 
+                    container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(220px, 1fr))'; 
+                    container.style.gap = '8px'; 
+                    container.style.width = '100%';
                     
-                    if (state.commModule.toUpperCase() === mod) {
-                        btn.classList.add('active');
-                        btn.style.borderColor = 'var(--accent)';
-                        btn.style.backgroundColor = 'var(--bg-app)';
-                    }
-                    
-                    btn.innerText = moduleNames[mod] || mod;
-                    btn.title = btn.innerText;
-                    
-                    btn.onclick = () => {
-                        document.querySelectorAll('.module-card').forEach(b => {
-                            b.classList.remove('active');
-                            b.style.borderColor = 'var(--border)';
-                            b.style.backgroundColor = 'var(--bg-panel)';
-                        });
-                        btn.classList.add('active');
-                        btn.style.borderColor = 'var(--accent)';
-                        btn.style.backgroundColor = 'var(--bg-app)';
-                        setCommModule(mod.toLowerCase());
-                    };
-                    container.appendChild(btn);
-                });
-            }
-        });
+                    container.innerHTML = ''; 
+                    data.modules.forEach(mod => {
+                        const btn = document.createElement('div');
+                        btn.className = 'module-card';
+                        btn.style.cssText = "background:var(--bg-panel); border:1px solid var(--border); padding:8px 12px; border-radius:4px; cursor:pointer; font-size:12px; display:flex; align-items:center; min-height:30px;";
+                        
+                        if (state.commModule.toUpperCase() === mod) {
+                            btn.classList.add('active');
+                            btn.style.borderColor = 'var(--accent)';
+                            btn.style.backgroundColor = 'var(--bg-app)';
+                        }
+                        
+                        btn.innerText = moduleNames[mod] || mod;
+                        btn.title = btn.innerText;
+                        
+                        btn.onclick = () => {
+                            document.querySelectorAll('.module-card').forEach(b => {
+                                b.classList.remove('active');
+                                b.style.borderColor = 'var(--border)';
+                                b.style.backgroundColor = 'var(--bg-panel)';
+                            });
+                            btn.classList.add('active');
+                            btn.style.borderColor = 'var(--accent)';
+                            btn.style.backgroundColor = 'var(--bg-app)';
+                            setCommModule(mod.toLowerCase());
+                        };
+                        container.appendChild(btn);
+                    });
+                }
+            })
+            .catch(e => {
+                console.error("Error loading commentaries:", e);
+                if (retryCount < 5) {
+                    setTimeout(() => populateCommentaries(retryCount + 1), 500);
+                }
+            });
+    };
+    populateCommentaries();
 
     // 4. Populate Book Selector
     const bookSel = document.getElementById('sel-book');

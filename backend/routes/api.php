@@ -16,18 +16,21 @@ Route::get('/study/definition', [StudyController::class, 'getDefinition']);
 Route::get('/search', [SearchController::class, 'search']);
 
 Route::get('/topics', function (Illuminate\Http\Request $request) {
-    $db = Illuminate\Support\Facades\DB::connection('core');
     $m = strtoupper($request->get('module', 'EASTON'));
-    $table = ($m == 'HEBREW' || $m == 'GREEK') ? 'extras.lexicon' : 'extras.dictionaries';
-    $field = ($m == 'HEBREW' || $m == 'GREEK') ? 'id' : 'topic';
+    $isLex = ($m == 'HEBREW' || $m == 'GREEK');
     
-    $results = $db->table($table)
-        ->when($m == 'HEBREW' || $m == 'GREEK', function($q) use ($m, $field) {
+    $table = $isLex ? 'lexicon' : 'dictionaries';
+    $field = $isLex ? 'id' : 'topic';
+    
+    $results = Illuminate\Support\Facades\DB::connection('extras')
+        ->table($table)
+        ->when($isLex, function($q) use ($m, $field) {
             return $q->where($field, 'LIKE', ($m=='HEBREW'?'H':'G').'%');
         }, function($q) use ($m) {
             return $q->where('module', $m);
         })
         ->orderBy($field)
+        ->limit(1000) // Optimization: Don't load 20,000+ words at once
         ->pluck($field);
 
     return response()->json(['topics' => $results->map(fn($t) => ['id' => $t, 'label' => $t])]);

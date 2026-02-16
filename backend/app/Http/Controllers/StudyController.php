@@ -95,8 +95,15 @@ class StudyController extends Controller
 
     public function getCommentaryList()
     {
+        $modules = Commentary::pluck('abbreviation')->map('strtoupper');
+        
+        // Fallback if DB is empty or missing modules
+        if ($modules->isEmpty()) {
+            $modules = collect(['MHC', 'BARNES', 'JFB', 'ACC', 'RWP']);
+        }
+        
         return response()->json([
-            'modules' => Commentary::pluck('abbreviation')->map('strtoupper')
+            'modules' => $modules
         ]);
     }
 }

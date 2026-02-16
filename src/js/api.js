@@ -1,6 +1,7 @@
 // --- API Interaction & Caching ---
+const API_BASE = 'http://127.0.0.1:8000';
 
-function loadPane(paneId) {
+function loadPane(paneId, retryCount = 0) {
     const pane = document.getElementById(paneId);
     const type = pane.dataset.type;
     const contentDiv = document.getElementById(`${paneId}-content`);
@@ -21,7 +22,7 @@ function loadPane(paneId) {
         }
 
         // 2. Fetch
-        const apiUrl = `api/bible/chapter?book=${encodeURIComponent(state.book)}&chapter=${state.chapter}&version=${state.version}&interlinear=${state.interlinear}`;
+        const apiUrl = `${API_BASE}/api/bible/chapter?book=${encodeURIComponent(state.book)}&chapter=${state.chapter}&version=${state.version}&interlinear=${state.interlinear}`;
         fetch(apiUrl)
             .then(r => {
                 if (!r.ok) throw new Error("Network response was not ok");
@@ -36,7 +37,12 @@ function loadPane(paneId) {
             })
             .catch(err => {
                 console.error("Fetch error:", err);
-                contentDiv.innerHTML = "Failed to load content.";
+                if (retryCount < 5) {
+                    contentDiv.innerHTML = "Warming up...";
+                    setTimeout(() => loadPane(paneId, retryCount + 1), 500);
+                } else {
+                    contentDiv.innerHTML = "Failed to load content. Please check server.";
+                }
             });
     } else {
         updatePaneContent(paneId);
@@ -92,7 +98,7 @@ function updatePaneContent(paneId) {
         }
         
         contentDiv.innerHTML = 'Loading...';
-        const apiUrl = `api/study/commentary?book=${encodeURIComponent(state.book)}&chapter=${state.chapter}&verse=${state.verse}&module=${state.commModule}`;
+        const apiUrl = `${API_BASE}/api/study/commentary?book=${encodeURIComponent(state.book)}&chapter=${state.chapter}&verse=${state.verse}&module=${state.commModule}`;
         fetch(apiUrl)
             .then(r => r.json())
             .then(data => {
@@ -111,7 +117,7 @@ function updatePaneContent(paneId) {
         }
 
         contentDiv.innerHTML = 'Loading...';
-        const apiUrl = `api/study/xrefs?book=${encodeURIComponent(state.book)}&chapter=${state.chapter}&verse=${state.verse}`;
+        const apiUrl = `${API_BASE}/api/study/xrefs?book=${encodeURIComponent(state.book)}&chapter=${state.chapter}&verse=${state.verse}`;
         fetch(apiUrl)
             .then(r => {
                 const ct = r.headers.get("content-type");
@@ -147,7 +153,7 @@ function updatePaneContent(paneId) {
             renderTopicList(listDiv, cachedTopics, currentMod);
         } else {
             listDiv.innerHTML = "Loading...";
-            fetch(`api/topics?module=${currentMod}`)
+            fetch(`${API_BASE}/api/topics?module=${currentMod}`)
                 .then(r => r.json())
                 .then(data => {
                     Cache.set('dictionary', topicKey, data.topics);
@@ -165,7 +171,7 @@ function updatePaneContent(paneId) {
                 defDiv.innerHTML = `<div style="font-size:16px; line-height:1.6;">${(cachedDef || "Not found.").replace(/\n/g, '<br>')}<\/div>`;
             } else {
                 defDiv.innerHTML = "Loading...";
-                fetch(`api/study/definition?term=${encodeURIComponent(state.lookupTerm)}&type=${defType}&module=${currentMod}`)
+                fetch(`${API_BASE}/api/study/definition?term=${encodeURIComponent(state.lookupTerm)}&type=${defType}&module=${currentMod}`)
                     .then(r => r.json())
                     .then(data => {
                         Cache.set('dictionary', defKey, data.definition);
@@ -183,7 +189,7 @@ function updatePaneContent(paneId) {
         // Inline Debug Display
         if (state.searchQuery === 'DEBUG') {
             contentDiv.innerHTML = 'Running System Diagnostic...';
-            fetch('debug.php')
+            fetch(`${API_BASE}/debug.php`)
                 .then(r => r.text())
                 .then(html => {
                     contentDiv.innerHTML = `<div style="font-family:monospace; font-size:12px; white-space:pre-wrap; background:#000; color:#0f0; padding:20px; border-radius:8px;">${html}</div>`;
@@ -194,7 +200,7 @@ function updatePaneContent(paneId) {
             return;
         }
         
-        fetch(`api/search?q=${encodeURIComponent(state.searchQuery)}&version=${state.version}&scope=${encodeURIComponent(state.searchScope)}&offset=${state.searchOffset}`)
+        fetch(`${API_BASE}/api/search?q=${encodeURIComponent(state.searchQuery)}&version=${state.version}&scope=${encodeURIComponent(state.searchScope)}&offset=${state.searchOffset}`)
             .then(r => r.json())
             .then(data => {
                 const currentShowing = Math.min(state.searchOffset + 200, data.count);
