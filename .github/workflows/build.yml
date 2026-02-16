@@ -53,8 +53,8 @@ jobs:
           if (Test-Path "$phpDir\ext") {
             Copy-Item -Path "$phpDir\ext" -Destination "php\" -Recurse -Force
           }
-          # Copy our custom php.ini (prepared in the repo)
-          Copy-Item -Path "php\php.ini" -Destination "php\php.ini" -Force
+          # Copy our custom php.ini from the root into the bundled php folder
+          Copy-Item -Path "php.ini" -Destination "php\php.ini" -Force
         shell: pwsh
 
       - name: Build & Publish
