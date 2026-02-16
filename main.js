@@ -202,19 +202,6 @@ async function ensureDatabases() {
 async function startPhpServer() {
     await ensureDatabases();
 
-    // FINAL CONNECTIVITY TEST
-    log('[DATABASE] Testing connectivity...');
-    try {
-        const sqlite3 = require('sqlite3').verbose();
-        const testDb = new sqlite3.Database(path.join(appDbDir, DATABASES.core.fileName), sqlite3.OPEN_READONLY, (err) => {
-            if (err) log(`[DATABASE] ✗ Connectivity Test Failed: ${err.message}`);
-            else log('[DATABASE] ✓ Connectivity Test Passed');
-        });
-        testDb.close();
-    } catch (e) {
-        log(`[DATABASE] ✗ Test script failed: ${e.message}`);
-    }
-
     if (!fs.existsSync(phpExec)) {
         log(`[PHP] ✗ Executable missing: ${phpExec}`);
         dialog.showErrorBox("Startup Error", `PHP missing at: ${phpExec}`);
