@@ -34,12 +34,28 @@ class TextService {
         // 2. Handle bold tags \x07
         $text = preg_replace("/\x07(.*?)\x07/", "<b>$1</b>", $text);
 
-        // 3. Handle reference tags \x03
+        // 3. Handle italic tags \x06
+        $text = preg_replace("/\x06(.*?)\x06/", "<i>$1</i>", $text);
+
+        // 4. Handle sequential reference tags \x03 (prevents Genesis 1:1Genesis 1:2)
+        $text = preg_replace_callback("/((\x03[0-9A-Fa-f-]+\x03)+)/", function($matches) {
+            $allHex = $matches[1];
+            // Split by the delimiters and filter empty
+            $parts = array_filter(explode("\x03", $allHex));
+            
+            $results = [];
+            foreach ($parts as $p) {
+                $results[] = self::resolveHexReference($p);
+            }
+            return implode(", ", $results);
+        }, $text);
+
+        // 5. Handle standalone reference tags \x03 (if any escaped step 4)
         $text = preg_replace_callback("/\x03([0-9A-Fa-f-]+)\x03/", function($matches) {
             return self::resolveHexReference($matches[1]);
         }, $text);
 
-        // 4. Handle bare hex references in parentheses (e.g. (580458C3))
+        // 6. Handle bare hex references in parentheses (e.g. (580458C3))
         $text = preg_replace_callback("/\(([0-9A-Fa-f]{4,})\)/", function($matches) {
             return "(" . self::resolveHexReference($matches[1]) . ")";
         }, $text);
