@@ -418,3 +418,55 @@ mark {
     color: white;
 }
 .menu-item span { font-weight: bold; }
+
+/* Verse Preview (Hover) */
+#verse-preview {
+    position: fixed;
+    z-index: 10001;
+    background: var(--bg-panel);
+    border-left: 4px solid var(--accent);
+    border-radius: 4px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2), 0 0 0 1px var(--border);
+    padding: 16px;
+    max-width: 450px;
+    max-height: 300px;
+    overflow-y: auto;
+    display: none;
+    pointer-events: none;
+    font-family: 'Merriweather', serif;
+    font-size: 16px;
+    line-height: 1.7;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    opacity: 0;
+    transform: translateY(5px);
+}
+#verse-preview.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+#verse-preview .preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+}
+#verse-preview .preview-version {
+    background: var(--bg-app);
+    color: var(--text-muted);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 9px;
+}
+#verse-preview sup {
+    color: var(--accent);
+    font-weight: bold;
+    margin-right: 2px;
+}

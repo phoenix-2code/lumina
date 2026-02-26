@@ -82,13 +82,49 @@ class BibleController extends Controller
         ]);
     }
 
-    public function getVersions()
-    {
-        $v1 = Verse::onVersion('KJV')->distinct()->pluck('version');
-        $v2 = Verse::onVersion('NIV')->distinct()->pluck('version');
+        public function getVersions()
+        {
+            $v1 = Verse::onVersion('KJV')->distinct()->pluck('version');
+            $v2 = Verse::onVersion('NIV')->distinct()->pluck('version');
+            
+            return response()->json([
+                'versions' => $v1->concat($v2)->unique()->values()
+            ]);
+        }
+    
+            public function getVerse(Request $request)
+            {
+                $bookName = $request->get('book');
+                $chapter = (int)$request->get('chapter');
+                $verseNum = (int)$request->get('verse');
+                $endVerse = $request->get('end_verse');
+                $version = $request->get('version', 'KJV');
         
-        return response()->json([
-            'versions' => $v1->concat($v2)->unique()->values()
-        ]);
+                $book = Book::where('name', $bookName)->first();
+                if (!$book) return response()->json(['error' => 'Book not found'], 404);
+        
+                $query = Verse::onVersion($version)
+                    ->where('book_id', $book->id)
+                    ->where('chapter', $chapter)
+                    ->where('version', $version);
+        
+                if ($endVerse) {
+                    $verses = $query->whereBetween('verse', [$verseNum, (int)$endVerse])
+                        ->orderBy('verse')
+                        ->get();
+                    
+                    $text = "";
+                    foreach($verses as $v) {
+                        $text .= "<sup>{$v->verse}</sup> " . TextService::sanitizeHTML($v->text) . " ";
+                    }
+                    return response()->json(['text' => trim($text)]);
+                } else {
+                    $verse = $query->where('verse', $verseNum)->first();
+                    return response()->json([
+                        'text' => $verse ? TextService::sanitizeHTML($verse->text) : "Verse not found."
+                    ]);
+                }
+            }
+        
     }
-}
+    

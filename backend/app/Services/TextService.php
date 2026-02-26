@@ -31,24 +31,84 @@ class TextService {
         // 1. Sanitize input
         $text = self::sanitizeHTML($text);
         
-        // 2. Strip control characters
-        $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $text);
+        // 2. Handle bold tags \x07
+        $text = preg_replace("/\x07(.*?)\x07/", "<b>$1</b>", $text);
 
-        // 3. Simple Reference Replacement (matches »123« or hex »A1B«)
+        // 3. Handle reference tags \x03
+        $text = preg_replace_callback("/\x03([0-9A-Fa-f-]+)\x03/", function($matches) {
+            return self::resolveHexReference($matches[1]);
+        }, $text);
+
+        // 4. Handle bare hex references in parentheses (e.g. (580458C3))
+        $text = preg_replace_callback("/\(([0-9A-Fa-f]{4,})\)/", function($matches) {
+            return "(" . self::resolveHexReference($matches[1]) . ")";
+        }, $text);
+
+        // 5. Strip remaining control characters
+        $text = preg_replace('/[\x00-\x1F]/', '', $text);
+
+        // 6. Legacy »...« logic (re-using the new resolver)
         $text = preg_replace_callback('/»([0-9A-Fa-f]+)«/', function($matches) {
-            $val = $matches[1];
-            $id = ctype_digit($val) ? intval($val) : hexdec($val);
-            
-            if ($id >= 1 && $id <= 31102) {
-                $verse = Verse::onVersion('KJV')->with('book')->find($id);
-                if ($verse) {
-                    $bookName = addslashes($verse->book->name);
-                    return "<span class='ref-link' onclick=\"jumpTo('{$bookName}', {$verse->chapter}, {$verse->verse})\">{$verse->book->name} {$verse->chapter}:{$verse->verse}</span>";
-                }
-            }
-            return "[$val]";
+            return self::resolveHexReference($matches[1]);
         }, $text);
 
         return $text;
+    }
+
+    private static function resolveHexReference($hex) {
+        // Handle Ranges (e.g., 5749-575D)
+        if (strpos($hex, '-') !== false) {
+            $parts = explode('-', $hex);
+            $startId = hexdec($parts[0]);
+            $endId = hexdec($parts[1]);
+            
+            $startVerse = Verse::onVersion('KJV')->with('book')->find($startId);
+            $endVerse = Verse::onVersion('KJV')->with('book')->find($endId);
+            
+            if (!$startVerse || !$endVerse) return "[$hex]";
+            
+            $bookName = $startVerse->book->name;
+            $safeBook = addslashes($bookName);
+            
+            if ($startVerse->book_id === $endVerse->book_id) {
+                if ($startVerse->chapter === $endVerse->chapter) {
+                    $label = "{$bookName} {$startVerse->chapter}:{$startVerse->verse}-{$endVerse->verse}";
+                } else {
+                    $label = "{$bookName} {$startVerse->chapter}:{$startVerse->verse}-{$endVerse->chapter}:{$endVerse->verse}";
+                }
+            } else {
+                $label = "{$bookName} {$startVerse->chapter}:{$startVerse->verse} - {$endVerse->book->name} {$endVerse->chapter}:{$endVerse->verse}";
+            }
+            
+            return "<span class=\"ref-link\" data-book=\"{$bookName}\" data-chapter=\"{$startVerse->chapter}\" data-verse=\"{$startVerse->verse}\" data-end-verse=\"{$endVerse->verse}\" onclick=\"jumpTo('{$safeBook}', {$startVerse->chapter}, {$startVerse->verse})\">{$label}</span>";
+        }
+        
+        // Handle Lists or Single (e.g., 580458C3 or 5749)
+        if (strlen($hex) >= 4 && strlen($hex) % 4 === 0) {
+            $refs = [];
+            for ($i = 0; $i < strlen($hex); $i += 4) {
+                $id = hexdec(substr($hex, $i, 4));
+                $verse = Verse::onVersion('KJV')->with('book')->find($id);
+                if ($verse) {
+                    $bookName = $verse->book->name;
+                    $safeBook = addslashes($bookName);
+                    $refs[] = "<span class=\"ref-link\" data-book=\"{$bookName}\" data-chapter=\"{$verse->chapter}\" data-verse=\"{$verse->verse}\" onclick=\"jumpTo('{$safeBook}', {$verse->chapter}, {$verse->verse})\">{$verse->book->name} {$verse->chapter}:{$verse->verse}</span>";
+                }
+            }
+            return implode('; ', $refs);
+        }
+
+        // Fallback for direct IDs
+        $id = ctype_digit($hex) ? intval($hex) : hexdec($hex);
+        if ($id >= 1 && $id <= 31102) {
+            $verse = Verse::onVersion('KJV')->with('book')->find($id);
+            if ($verse) {
+                $bookName = $verse->book->name;
+                $safeBook = addslashes($bookName);
+                return "<span class=\"ref-link\" data-book=\"{$bookName}\" data-chapter=\"{$verse->chapter}\" data-verse=\"{$verse->verse}\" onclick=\"jumpTo('{$safeBook}', {$verse->chapter}, {$verse->verse})\">{$verse->book->name} {$verse->chapter}:{$verse->verse}</span>";
+            }
+        }
+
+        return "[$hex]";
     }
 }

@@ -401,6 +401,85 @@ function openComm(mod, v) {
     setCommModule(mod.toLowerCase());
 }
 
+// --- Verse Preview Logic ---
+document.addEventListener('mouseover', e => {
+    const link = e.target.closest('.ref-link');
+    if (link) {
+        const book = link.dataset.book;
+        const chapter = link.dataset.chapter;
+        const verse = link.dataset.verse;
+        
+        if (book && chapter && verse) {
+            showVersePreview(e, book, chapter, verse);
+        }
+    }
+});
+
+document.addEventListener('mouseout', e => {
+    if (e.target.closest('.ref-link')) {
+        hideVersePreview();
+    }
+});
+
+function showVersePreview(e, b, c, v) {
+    const preview = document.getElementById('verse-preview');
+    const header = document.getElementById('preview-ref');
+    const textDiv = document.getElementById('preview-text');
+    const versionTag = document.getElementById('preview-version-tag');
+    const endVerse = e.target.closest('.ref-link').dataset.endVerse;
+    
+    if (!preview || !header || !textDiv) return;
+
+    const refLabel = endVerse ? `${b} ${c}:${v}-${endVerse}` : `${b} ${c}:${v}`;
+    header.innerText = refLabel;
+    textDiv.innerHTML = '<span style="color:var(--text-muted); font-style:italic;">Loading...</span>';
+    if (versionTag) versionTag.innerText = state.version;
+    
+    preview.style.display = 'block';
+    // Small timeout to allow display:block before adding .visible for transition
+    setTimeout(() => preview.classList.add('visible'), 10);
+
+    let x = e.clientX + 20;
+    let y = e.clientY + 20;
+    
+    if (x + 450 > window.innerWidth) x = e.clientX - 470;
+    if (y + 300 > window.innerHeight) y = e.clientY - 320;
+    
+    preview.style.left = `${x}px`;
+    preview.style.top = `${y}px`;
+    
+    const cacheKey = `PREVIEW_${b}_${c}_${v}_${endVerse || ''}_${state.version}`;
+    const cached = Cache.get('text', cacheKey);
+    if (cached) {
+        textDiv.innerHTML = cached;
+    } else {
+        let url = `${API_BASE}/api/bible/verse?book=${encodeURIComponent(b)}&chapter=${c}&verse=${v}&version=${state.version}`;
+        if (endVerse) url += `&end_verse=${endVerse}`;
+
+        fetch(url)
+            .then(r => r.json())
+            .then(data => {
+                const text = data.text || "Verse not found.";
+                Cache.set('text', cacheKey, text);
+                textDiv.innerHTML = text;
+            })
+            .catch(() => textDiv.innerHTML = '<span style="color:red;">Error loading preview.</span>');
+    }
+}
+
+function hideVersePreview() {
+    const preview = document.getElementById('verse-preview');
+    if (preview) {
+        preview.classList.remove('visible');
+        // Wait for transition before hiding
+        setTimeout(() => {
+            if (!preview.classList.contains('visible')) {
+                preview.style.display = 'none';
+            }
+        }, 200);
+    }
+}
+
 // Context Menu Logic
 let contextWord = "";
 

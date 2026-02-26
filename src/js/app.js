@@ -6,8 +6,31 @@ window.onload = function() {
     const statusOverlay = document.createElement('div');
     statusOverlay.id = 'boot-overlay';
     statusOverlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg-app); z-index:99999; display:flex; flex-direction:column; justify-content:center; align-items:center;';
-    statusOverlay.innerHTML = '<h2 style="color:var(--accent)">Lumina</h2><p id="boot-msg">Starting engine...</p><div class="loader"></div>';
+    statusOverlay.innerHTML = '<h2 style="color:var(--accent)">Lumina</h2><p id="boot-msg">Starting engine...</p><div class="loader"></div><div id="boot-progress-container" style="display:none; width:300px; height:6px; background:var(--border); border-radius:3px; margin-top:20px; overflow:hidden;"><div id="boot-progress-bar" style="width:0%; height:100%; background:var(--accent); transition:width 0.2s;"></div></div>';
     document.body.appendChild(statusOverlay);
+
+    // --- Electron IPC Listeners ---
+    if (window.require) {
+        const { ipcRenderer } = window.require('electron');
+        const bootMsg = document.getElementById('boot-msg');
+        const progressContainer = document.getElementById('boot-progress-container');
+        const progressBar = document.getElementById('boot-progress-bar');
+
+        ipcRenderer.on('download-status', (event, data) => {
+            if (data.status === 'downloading') {
+                bootMsg.innerText = `Downloading ${data.database}...`;
+                progressContainer.style.display = 'block';
+            } else if (data.status === 'complete') {
+                bootMsg.innerText = `Finished ${data.database}. Starting engine...`;
+                setTimeout(() => progressContainer.style.display = 'none', 1000);
+            }
+        });
+
+        ipcRenderer.on('download-progress', (event, data) => {
+            progressBar.style.width = data.progress + '%';
+            bootMsg.innerText = `Downloading ${data.database}: ${data.progress}%`;
+        });
+    }
 
     // 1. Wait for Heartbeat
     const checkServer = () => {

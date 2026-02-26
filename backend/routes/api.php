@@ -10,6 +10,7 @@ Route::get('/up', function() {
 });
 
 Route::get('/bible/chapter', [BibleController::class, 'getChapter']);
+Route::get('/bible/verse', [BibleController::class, 'getVerse']);
 Route::get('/bible/versions', [BibleController::class, 'getVersions']);
 
 Route::get('/study/commentary', [StudyController::class, 'getCommentary']);
