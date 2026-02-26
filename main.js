@@ -25,11 +25,13 @@ const DATABASES = {
   core: {
     bundled: true,
     fileName: 'core.db',
+    displayName: 'Core Database',
     size: 15 * 1024 * 1024
   },
   versions: {
     bundled: false,
     fileName: 'versions.db',
+    displayName: 'Bible Versions',
     url: 'https://pub-bf0a74e2ba37417e92a1313629c26b3b.r2.dev/versions.db.zip',
     size: 150 * 1024 * 1024,
     compressed: true
@@ -37,6 +39,7 @@ const DATABASES = {
   commentaries: {
     bundled: false,
     fileName: 'commentaries.db',
+    displayName: 'Commentaries',
     url: 'https://pub-bf0a74e2ba37417e92a1313629c26b3b.r2.dev/commentaries.db.zip',
     size: 180 * 1024 * 1024,
     compressed: true
@@ -44,6 +47,7 @@ const DATABASES = {
   extras: {
     bundled: true,
     fileName: 'extras.db',
+    displayName: 'Lexicons',
     size: 16 * 1024 * 1024
   }
 };
@@ -181,12 +185,12 @@ async function ensureDatabases() {
                 fs.copyFileSync(sourcePath, dbFilePath);
             } else {
                 log(`[DATABASE] Downloading: ${config.fileName}`);
-                if (mainWindow) mainWindow.webContents.send('download-status', { database: config.fileName, status: 'downloading' });
+                if (mainWindow) mainWindow.webContents.send('download-status', { database: config.displayName, status: 'downloading' });
                 
                 await downloadDatabase(config.url, dbFilePath, config.compressed, (received, total, progress) => {
-                    if (mainWindow) mainWindow.webContents.send('download-progress', { database: config.fileName, progress: progress.toFixed(1) });
+                    if (mainWindow) mainWindow.webContents.send('download-progress', { database: config.displayName, progress: progress.toFixed(1) });
                 });
-                if (mainWindow) mainWindow.webContents.send('download-status', { database: config.fileName, status: 'complete' });
+                if (mainWindow) mainWindow.webContents.send('download-status', { database: config.displayName, status: 'complete' });
             }
         } catch (error) {
             log(`[DATABASE] ✗ Error: ${error.message}`);

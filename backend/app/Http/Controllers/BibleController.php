@@ -108,17 +108,18 @@ class BibleController extends Controller
                     ->where('chapter', $chapter)
                     ->where('version', $version);
         
-                if ($endVerse) {
-                    $verses = $query->whereBetween('verse', [$verseNum, (int)$endVerse])
-                        ->orderBy('verse')
-                        ->get();
-                    
-                    $text = "";
-                    foreach($verses as $v) {
-                        $text .= "<sup>{$v->verse}</sup> " . TextService::sanitizeHTML($v->text) . " ";
-                    }
-                    return response()->json(['text' => trim($text)]);
-                } else {
+                        if ($endVerse) {
+                            $verses = $query->whereBetween('verse', [$verseNum, (int)$endVerse])
+                                ->orderBy('verse')
+                                ->get();
+                            
+                            $textParts = [];
+                            foreach($verses as $v) {
+                                $textParts[] = "<sup>{$v->verse}</sup> " . TextService::sanitizeHTML($v->text);
+                            }
+                            return response()->json(['text' => implode(', ', $textParts)]);
+                        } else {
+                
                     $verse = $query->where('verse', $verseNum)->first();
                     return response()->json([
                         'text' => $verse ? TextService::sanitizeHTML($verse->text) : "Verse not found."

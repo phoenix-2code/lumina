@@ -402,9 +402,12 @@ function openComm(mod, v) {
 }
 
 // --- Verse Preview Logic ---
+let hidePreviewTimeout = null;
+
 document.addEventListener('mouseover', e => {
     const link = e.target.closest('.ref-link');
     if (link) {
+        if (hidePreviewTimeout) clearTimeout(hidePreviewTimeout);
         const book = link.dataset.book;
         const chapter = link.dataset.chapter;
         const verse = link.dataset.verse;
@@ -417,9 +420,27 @@ document.addEventListener('mouseover', e => {
 
 document.addEventListener('mouseout', e => {
     if (e.target.closest('.ref-link')) {
-        hideVersePreview();
+        startHidePreview();
     }
 });
+
+// Allow the user to hover over the preview itself without it hiding
+const previewEl = document.getElementById('verse-preview');
+if (previewEl) {
+    previewEl.addEventListener('mouseenter', () => {
+        if (hidePreviewTimeout) clearTimeout(hidePreviewTimeout);
+    });
+    previewEl.addEventListener('mouseleave', () => {
+        startHidePreview();
+    });
+}
+
+function startHidePreview() {
+    if (hidePreviewTimeout) clearTimeout(hidePreviewTimeout);
+    hidePreviewTimeout = setTimeout(() => {
+        hideVersePreview();
+    }, 300); // 300ms grace period to move mouse to tooltip
+}
 
 function showVersePreview(e, b, c, v) {
     const preview = document.getElementById('verse-preview');

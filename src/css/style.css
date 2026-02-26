@@ -432,7 +432,7 @@ mark {
     max-height: 300px;
     overflow-y: auto;
     display: none;
-    pointer-events: none;
+    pointer-events: auto;
     font-family: 'Merriweather', serif;
     font-size: 16px;
     line-height: 1.7;
