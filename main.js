@@ -269,6 +269,33 @@ app.on('ready', () => {
     startPhpServer().catch(err => {
         log(`[APP] CRITICAL STARTUP FAILURE: ${err.message}`);
     });
+
+    // 3. Check for Updates (2 seconds after launch)
+    if (!isDev) {
+        setTimeout(() => {
+            log('[UPDATE] Checking for updates...');
+            autoUpdater.checkForUpdatesAndNotify();
+        }, 2000);
+    }
+});
+
+// --- Auto-Updater Events ---
+autoUpdater.on('update-available', () => {
+    log('[UPDATE] Update available.');
+    if (mainWindow) mainWindow.webContents.send('update_available');
+});
+
+autoUpdater.on('update-downloaded', () => {
+    log('[UPDATE] Update downloaded.');
+    if (mainWindow) mainWindow.webContents.send('update_downloaded');
+});
+
+autoUpdater.on('error', (err) => {
+    log(`[UPDATE] Error: ${err.message}`);
+});
+
+ipcMain.on('restart_app', () => {
+    autoUpdater.quitAndInstall();
 });
 
 app.on('window-all-closed', () => {
