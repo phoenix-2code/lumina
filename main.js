@@ -167,6 +167,9 @@ async function ensureDatabases() {
         log(`[DATABASE] Created directory: ${appDbDir}`);
     }
 
+    const missingConfigs = [];
+    const progressMap = {};
+
     for (const [key, config] of Object.entries(DATABASES)) {
         const dbFilePath = path.join(appDbDir, config.fileName);
         
@@ -175,28 +178,62 @@ async function ensureDatabases() {
             continue;
         }
 
-        try {
-            if (config.bundled) {
+        if (config.bundled) {
+            try {
                 const sourceDir = isDev ? path.join(resourcesPath, 'assets', 'data') : path.join(resourcesPath, 'databases');
                 const sourcePath = path.join(sourceDir, config.fileName);
                 log(`[DATABASE] Copying bundled: ${config.fileName} from ${sourcePath}`);
                 
                 if (!fs.existsSync(sourcePath)) throw new Error(`Bundled source missing: ${sourcePath}`);
                 fs.copyFileSync(sourcePath, dbFilePath);
-            } else {
-                log(`[DATABASE] Downloading: ${config.fileName}`);
-                if (mainWindow) mainWindow.webContents.send('download-status', { database: config.displayName, status: 'downloading' });
-                
-                await downloadDatabase(config.url, dbFilePath, config.compressed, (received, total, progress) => {
-                    if (mainWindow) mainWindow.webContents.send('download-progress', { database: config.displayName, progress: progress.toFixed(1) });
-                });
-                if (mainWindow) mainWindow.webContents.send('download-status', { database: config.displayName, status: 'complete' });
+            } catch (e) {
+                log(`[DATABASE] ✗ Bundled copy failed: ${e.message}`);
+                missingConfigs.push(config); // Try downloading if bundled copy fails
             }
-        } catch (error) {
-            log(`[DATABASE] ✗ Error: ${error.message}`);
-            dialog.showErrorBox("Database Error", `Failed to prepare ${config.fileName}: ${error.message}`);
-            throw error;
+        } else {
+            missingConfigs.push(config);
         }
+    }
+
+    if (missingConfigs.length === 0) return;
+
+    log(`[DATABASE] Preparing to download ${missingConfigs.length} files in parallel...`);
+    
+    // UI: Show general downloading status
+    if (mainWindow) {
+        mainWindow.webContents.send('download-status', { 
+            database: missingConfigs.length > 1 ? 'Core Components' : missingConfigs[0].displayName, 
+            status: 'downloading' 
+        });
+    }
+
+    const downloadPromises = missingConfigs.map(config => {
+        const dbFilePath = path.join(appDbDir, config.fileName);
+        progressMap[config.fileName] = 0;
+
+        return downloadDatabase(config.url, dbFilePath, config.compressed, (received, total, progress) => {
+            progressMap[config.fileName] = progress;
+            
+            // Calculate Global Progress
+            const totalProgress = Object.values(progressMap).reduce((a, b) => a + b, 0) / missingConfigs.length;
+            
+            if (mainWindow) {
+                mainWindow.webContents.send('download-progress', { 
+                    database: missingConfigs.length > 1 ? 'System Data' : config.displayName, 
+                    progress: totalProgress.toFixed(1) 
+                });
+            }
+        });
+    });
+
+    try {
+        await Promise.all(downloadPromises);
+        log('[DATABASE] ✓ All downloads complete');
+        if (mainWindow) mainWindow.webContents.send('download-status', { database: 'All files', status: 'complete' });
+    } catch (error) {
+        log(`[DATABASE] ✗ Download group failed: ${error.message}`);
+        dialog.showErrorBox("Download Error", `Failed to download required data: ${error.message}`);
+        throw error;
     }
 }
 
@@ -264,7 +301,7 @@ function createWindow() {
 
 // --- APP LIFECYCLE ---
 app.on('ready', () => {
-    log('--- App Starting v1.6.6 ---');
+    log('--- App Starting v1.6.7 ---');
     
     // 1. Show window IMMEDIATELY so user sees progress
     createWindow();
