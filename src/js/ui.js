@@ -403,11 +403,17 @@ function openComm(mod, v) {
 
 // --- Verse Preview Logic ---
 let hidePreviewTimeout = null;
+let currentPreviewUrl = null;
 
 document.addEventListener('mouseover', e => {
     const link = e.target.closest('.ref-link');
     if (link) {
         if (hidePreviewTimeout) clearTimeout(hidePreviewTimeout);
+        
+        // Remove previous highlights
+        document.querySelectorAll('.ref-link').forEach(el => el.classList.remove('hover-highlight'));
+        link.classList.add('hover-highlight');
+
         const book = link.dataset.book;
         const chapter = link.dataset.chapter;
         const verse = link.dataset.verse;
@@ -419,7 +425,9 @@ document.addEventListener('mouseover', e => {
 });
 
 document.addEventListener('mouseout', e => {
-    if (e.target.closest('.ref-link')) {
+    const link = e.target.closest('.ref-link');
+    if (link) {
+        link.classList.remove('hover-highlight');
         startHidePreview();
     }
 });
@@ -453,8 +461,6 @@ function showVersePreview(e, b, c, v) {
 
     const refLabel = endVerse ? `${b} ${c}:${v}-${endVerse}` : `${b} ${c}:${v}`;
     header.innerText = refLabel;
-    textDiv.innerHTML = '<span style="color:var(--text-muted); font-style:italic;">Loading...</span>';
-    if (versionTag) versionTag.innerText = state.version;
     
     preview.style.display = 'block';
     // Small timeout to allow display:block before adding .visible for transition
@@ -471,20 +477,44 @@ function showVersePreview(e, b, c, v) {
     
     const cacheKey = `PREVIEW_${b}_${c}_${v}_${endVerse || ''}_${state.version}`;
     const cached = Cache.get('text', cacheKey);
+    
     if (cached) {
         textDiv.innerHTML = cached;
+        currentPreviewUrl = null;
     } else {
         let url = `${API_BASE}/api/bible/verse?book=${encodeURIComponent(b)}&chapter=${c}&verse=${v}&version=${state.version}`;
         if (endVerse) url += `&end_verse=${endVerse}`;
 
-        fetch(url)
+        if (currentPreviewUrl === url) return; // Already fetching this one
+        
+        textDiv.innerHTML = '<span style="color:var(--text-muted); font-style:italic;">Loading...</span>';
+        if (versionTag) versionTag.innerText = state.version;
+        
+        currentPreviewUrl = url;
+
+        // Use AbortController for fetch timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
+        fetch(url, { signal: controller.signal })
             .then(r => r.json())
             .then(data => {
+                clearTimeout(timeoutId);
+                if (currentPreviewUrl !== url) return; // Stale request
+                
                 const text = data.text || "Verse not found.";
                 Cache.set('text', cacheKey, text);
                 textDiv.innerHTML = text;
+                currentPreviewUrl = null;
             })
-            .catch(() => textDiv.innerHTML = '<span style="color:red;">Error loading preview.</span>');
+            .catch(err => {
+                clearTimeout(timeoutId);
+                if (currentPreviewUrl !== url) return;
+                
+                const msg = (err.name === 'AbortError') ? 'Request timed out.' : 'Error loading preview.';
+                textDiv.innerHTML = `<span style="color:red;">${msg}</span>`;
+                currentPreviewUrl = null;
+            });
     }
 }
 

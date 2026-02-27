@@ -264,7 +264,7 @@ function createWindow() {
 
 // --- APP LIFECYCLE ---
 app.on('ready', () => {
-    log('--- App Starting v1.6.4 ---');
+    log('--- App Starting v1.6.6 ---');
     
     // 1. Show window IMMEDIATELY so user sees progress
     createWindow();

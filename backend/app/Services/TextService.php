@@ -78,6 +78,12 @@ class TextService {
             $startId = hexdec($parts[0]);
             $endId = hexdec($parts[1]);
             
+            // Validate IDs
+            if ($startId < 1 || $startId > 31102 || $endId < 1 || $endId > 31102) {
+                \Illuminate\Support\Facades\Log::error("Invalid range resolution: {$hex} -> {$startId}-{$endId}");
+                return "[$hex]";
+            }
+
             $startVerse = Verse::onVersion('KJV')->with('book')->find($startId);
             $endVerse = Verse::onVersion('KJV')->with('book')->find($endId);
             
@@ -104,18 +110,22 @@ class TextService {
             $refs = [];
             for ($i = 0; $i < strlen($hex); $i += 4) {
                 $id = hexdec(substr($hex, $i, 4));
-                $verse = Verse::onVersion('KJV')->with('book')->find($id);
-                if ($verse) {
-                    $bookName = $verse->book->name;
-                    $safeBook = addslashes($bookName);
-                    $refs[] = "<span class=\"ref-link\" data-book=\"{$bookName}\" data-chapter=\"{$verse->chapter}\" data-verse=\"{$verse->verse}\" onclick=\"jumpTo('{$safeBook}', {$verse->chapter}, {$verse->verse})\">{$verse->book->name} {$verse->chapter}:{$verse->verse}</span>";
+                if ($id >= 1 && $id <= 31102) {
+                    $verse = Verse::onVersion('KJV')->with('book')->find($id);
+                    if ($verse) {
+                        $bookName = $verse->book->name;
+                        $safeBook = addslashes($bookName);
+                        $refs[] = "<span class=\"ref-link\" data-book=\"{$bookName}\" data-chapter=\"{$verse->chapter}\" data-verse=\"{$verse->verse}\" onclick=\"jumpTo('{$safeBook}', {$verse->chapter}, {$verse->verse})\">{$verse->book->name} {$verse->chapter}:{$verse->verse}</span>";
+                    }
+                } else {
+                    \Illuminate\Support\Facades\Log::warning("Invalid list ID: " . substr($hex, $i, 4) . " -> {$id}");
                 }
             }
-            return implode('; ', $refs);
+            return count($refs) > 0 ? implode('; ', $refs) : "[$hex]";
         }
 
-        // Fallback for direct IDs
-        $id = ctype_digit($hex) ? intval($hex) : hexdec($hex);
+        // Resolve single ID (ALWAYS treat as hex for legacy compatibility)
+        $id = hexdec($hex);
         if ($id >= 1 && $id <= 31102) {
             $verse = Verse::onVersion('KJV')->with('book')->find($id);
             if ($verse) {
@@ -125,6 +135,7 @@ class TextService {
             }
         }
 
+        \Illuminate\Support\Facades\Log::error("Failed to resolve commentary code: {$hex} (Dec: {$id})");
         return "[$hex]";
     }
 }

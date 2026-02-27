@@ -268,7 +268,12 @@ function renderXrefs(container, refs) {
     refs.forEach(x => {
         // Safe book name for JS string
         const safeBook = x.book.replace(/'/g, "\\'");
-        html += `<span class="v-link" onclick="jumpTo('${safeBook}', ${x.chapter}, ${x.verse})" style="font-size:13px; padding:6px 10px;">${x.book} ${x.chapter}:${x.verse}</span>`;
+        html += `<span class="v-link ref-link" 
+                       data-book="${x.book}" 
+                       data-chapter="${x.chapter}" 
+                       data-verse="${x.verse}" 
+                       onclick="jumpTo('${safeBook}', ${x.chapter}, ${x.verse})" 
+                       style="font-size:13px; padding:6px 10px;">${x.book} ${x.chapter}:${x.verse}</span>`;
     });
     
     html += `</div></div>`;

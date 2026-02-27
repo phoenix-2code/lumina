@@ -470,3 +470,11 @@ mark {
     font-weight: bold;
     margin-right: 2px;
 }
+
+.ref-link.hover-highlight {
+    background: var(--highlight);
+    color: var(--accent-hover);
+    border-radius: 3px;
+    box-shadow: 0 0 0 2px var(--highlight);
+    text-decoration: underline;
+}
