@@ -85,6 +85,15 @@ function startAppLogic() {
         state.version = nav.version;
     }
 
+    // Sync Interlinear UI & Body State
+    const chkInterlinear = document.getElementById('chk-interlinear');
+    if (chkInterlinear) chkInterlinear.checked = !!state.interlinear;
+    if (state.interlinear) {
+        document.body.classList.add('interlinear-active');
+    } else {
+        document.body.classList.remove('interlinear-active');
+    }
+
     // 2. Populate Bible Versions
     const populateVersions = (retryCount = 0) => {
         fetch(API_BASE + '/api/bible/versions')
@@ -187,6 +196,7 @@ function startAppLogic() {
     }
 
     // 5. Initial Load
+    if(typeof updateRefDisplay === 'function') updateRefDisplay();
     if(typeof updateVerseSelector === 'function') updateVerseSelector(); 
     
     const selBook = document.getElementById('sel-book');
@@ -204,5 +214,10 @@ function startAppLogic() {
             state.historyIndex = 0;
             if(typeof updateHistoryButtons === 'function') updateHistoryButtons();
         }
+    }
+
+    // 6. Initialize Universal Custom Dropdowns
+    if(typeof initAllCustomDropdowns === 'function') {
+        initAllCustomDropdowns();
     }
 }

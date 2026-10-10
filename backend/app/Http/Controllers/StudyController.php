@@ -33,14 +33,34 @@ class StudyController extends Controller
 
         if (!$verseId) return response()->json(['error' => 'Verse not found'], 404);
 
-        // 2. Fetch Commentary
-        $entry = CommentaryEntry::where('verse_id', $verseId)
-            ->whereHas('commentary', function($q) use ($abbr) {
-                $q->where('abbreviation', $abbr);
-            })
-            ->first();
+        // 2. Determine Available Modules for this specific verse
+        $availableModules = DB::connection('commentaries')
+            ->table('commentary_entries as ce')
+            ->join('commentaries as c', 'ce.commentary_id', '=', 'c.id')
+            ->where('ce.verse_id', $verseId)
+            ->pluck('c.abbreviation')
+            ->map('strtolower')
+            ->values()
+            ->all();
+
+        // If the requested module has no entry for this verse, automatically pick the first available one
+        if (!in_array($abbr, $availableModules) && !empty($availableModules)) {
+            $abbr = $availableModules[0];
+        }
+
+        // 3. Fetch Commentary Entry
+        $comm = Commentary::where('abbreviation', $abbr)->first();
+        $entry = null;
+
+        if ($comm) {
+            $entry = CommentaryEntry::where('commentary_id', $comm->id)
+                ->where('verse_id', $verseId)
+                ->first();
+        }
 
         return response()->json([
+            'module' => $abbr,
+            'available_modules' => $availableModules,
             'text' => $entry ? TextService::formatCommentary($entry->text) : "No commentary found for this verse."
         ]);
     }

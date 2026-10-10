@@ -176,9 +176,11 @@ function navigate() {
 }
 
 function navStep(direction) {
-    let current = parseInt(document.getElementById('inp-chapter').value);
+    let current = parseInt(state.chapter) || 1;
     let next = current + direction;
     if(next < 1) next = 1;
+    const maxCh = (BIBLE_STRUCTURE[state.book]) ? BIBLE_STRUCTURE[state.book].length : 1;
+    if(next > maxCh) next = maxCh;
     jumpTo(state.book, next, 1);
 }
 
@@ -206,6 +208,7 @@ function jumpTo(b, c, v, isNew = true) {
     if (selBook) selBook.value = b;
     if (inpChapter) inpChapter.value = c;
     
+    updateRefDisplay();
     updateVerseSelector(); // Requires BIBLE_STRUCTURE from state.js
 
     const pane1 = document.getElementById('pane-1');
@@ -228,6 +231,8 @@ function setVerse(v) {
     state.verse = v;
     const sel = document.getElementById('sel-verse');
     if(sel) sel.value = v;
+
+    updateRefDisplay();
 
     document.querySelectorAll('.verse-row').forEach(el => el.classList.remove('active'));
     const activeEl = document.getElementById(`v-${v}`);
@@ -254,7 +259,7 @@ function setCommModule(mod) {
     
     const titleSpan = document.getElementById('pane-2-title');
     const fullName = moduleNames[mod.toUpperCase()] || mod.toUpperCase();
-    titleSpan.innerText = `Commentary (${fullName})`;
+    if (titleSpan) titleSpan.innerText = `— ${fullName}`;
     
     document.querySelectorAll('.module-card').forEach(btn => {
         if(btn.innerText === fullName || btn.innerText === mod.toUpperCase()) {
@@ -274,11 +279,22 @@ function switchRefModule(mod) {
     }
 }
 
-function toggleInterlinear() {
-    state.interlinear = !state.interlinear;
-    const btn = document.getElementById('btn-interlinear');
-    btn.innerText = state.interlinear ? "Interlinear: ON" : "Interlinear: OFF";
-    btn.style.color = state.interlinear ? "var(--accent)" : "var(--text-main)";
+function toggleInterlinear(forcedVal) {
+    if (typeof forcedVal === 'boolean') {
+        state.interlinear = forcedVal;
+    } else {
+        state.interlinear = !state.interlinear;
+    }
+
+    const chk = document.getElementById('chk-interlinear');
+    if (chk) chk.checked = !!state.interlinear;
+
+    if (state.interlinear) {
+        document.body.classList.add('interlinear-active');
+    } else {
+        document.body.classList.remove('interlinear-active');
+    }
+
     reloadPanes();
 }
 
@@ -360,18 +376,20 @@ function changePaneContent(paneId, type) {
     const select = pane.querySelector('select');
     if(select) select.value = type;
     
-    let commTitle = `Commentary (${state.commModule.toUpperCase()})`;
-    if (moduleNames[state.commModule.toUpperCase()]) commTitle = moduleNames[state.commModule.toUpperCase()];
+    let commTitle = `— ${state.commModule.toUpperCase()}`;
+    if (typeof moduleNames !== 'undefined' && moduleNames[state.commModule.toUpperCase()]) {
+        commTitle = `— ${moduleNames[state.commModule.toUpperCase()]}`;
+    }
 
     const titles = {
-        'bible': 'Bible Text',
+        'bible': '',
         'commentary': commTitle,
-        'dictionary': `Dictionary (${state.dictModule})`,
-        'lex_browse': `Lexicon (${state.lexModule})`,
-        'xrefs': 'Cross References',
-        'search': `Search Results`
+        'dictionary': `— ${state.dictModule}`,
+        'lex_browse': `— ${state.lexModule}`,
+        'xrefs': '— Cross References',
+        'search': `— Search Results`
     };
-    titleSpan.innerText = titles[type] || 'Pane';
+    if (titleSpan) titleSpan.innerText = titles[type] || '';
     
     if (type === 'dict_browse') state.lookupTerm = "";
     
@@ -579,4 +597,583 @@ function contextDefine() {
     state.lookupTerm = contextWord;
     state.lookupType = 'dictionary';
     changePaneContent('pane-2', 'dictionary');
+}
+
+// ==========================================================================
+// Unified Reference Navigator (Go to & 3-Step Grid Controller)
+// ==========================================================================
+
+function updateRefDisplay() {
+    const lbl = document.getElementById('lbl-current-ref');
+    if (lbl) {
+        lbl.innerText = `${state.book} ${state.chapter}:${state.verse}`;
+    }
+}
+
+// Fast Client-Side Bible Reference Parser
+function parseBibleReference(text) {
+    if (!text || typeof text !== 'string') return null;
+    let s = text.trim().toLowerCase();
+    if (!s) return null;
+
+    s = s.replace(/\s+/g, ' ');
+    s = s.replace(/^first\s+|^1st\s+|^i\s+/, '1 ')
+         .replace(/^second\s+|^2nd\s+|^ii\s+/, '2 ')
+         .replace(/^third\s+|^3rd\s+|^iii\s+/, '3 ');
+
+    let bookKey = '', chStr = '', vStr = '';
+
+    // Matches references like "jn 3:16", "1 cor 13 4", "ps 23", "gen 1"
+    const numMatch = s.match(/(.+?)\s*(\d+)(?:[:\.\s](\d+))?$/);
+    if (numMatch) {
+        bookKey = numMatch[1].trim();
+        chStr = numMatch[2];
+        vStr = numMatch[3] || '';
+    } else {
+        bookKey = s.trim();
+    }
+
+    let book = (typeof BOOK_ABBREVIATIONS !== 'undefined') ? (BOOK_ABBREVIATIONS[bookKey] || BOOK_ABBREVIATIONS[bookKey.replace(/\s+/g, '')]) : null;
+
+    if (!book && chStr && !vStr) {
+        const fullKey = s.replace(/\s+/g, '');
+        const found = (typeof BOOK_ABBREVIATIONS !== 'undefined') ? (BOOK_ABBREVIATIONS[s] || BOOK_ABBREVIATIONS[fullKey]) : null;
+        if (found) {
+            book = found;
+            chStr = '1';
+            vStr = '1';
+        }
+    }
+
+    if (!book || !BIBLE_STRUCTURE[book]) return null;
+
+    const maxChapters = BIBLE_STRUCTURE[book].length;
+    let chapter = chStr ? parseInt(chStr, 10) : 1;
+    if (isNaN(chapter) || chapter < 1) chapter = 1;
+    if (chapter > maxChapters) chapter = maxChapters;
+
+    const maxVerses = (BIBLE_STRUCTURE[book] && BIBLE_STRUCTURE[book][chapter - 1]) ? BIBLE_STRUCTURE[book][chapter - 1] : 1;
+    let verse = vStr ? parseInt(vStr, 10) : 1;
+    if (isNaN(verse) || verse < 1) verse = 1;
+    if (verse > maxVerses) verse = maxVerses;
+
+    return {
+        book: book,
+        chapter: chapter,
+        verse: verse,
+        formatted: `${book} ${chapter}:${verse}`
+    };
+}
+
+let pickerState = {
+    book: "Genesis",
+    chapter: 1,
+    verse: 1,
+    step: "book"
+};
+
+function toggleRefPicker() {
+    const overlay = document.getElementById('ref-picker-overlay');
+    if (!overlay) return;
+    if (overlay.style.display === 'none' || !overlay.style.display) {
+        openRefPicker();
+    } else {
+        closeRefPicker();
+    }
+}
+
+function openRefPicker() {
+    const overlay = document.getElementById('ref-picker-overlay');
+    if (!overlay) return;
+
+    pickerState.book = state.book || "Genesis";
+    pickerState.chapter = state.chapter || 1;
+    pickerState.verse = state.verse || 1;
+
+    overlay.style.display = 'flex';
+    setPickerStep('book');
+
+    const input = document.getElementById('inp-ref-goto');
+    const badge = document.getElementById('ref-parsed-badge');
+    if (input) {
+        input.value = '';
+        setTimeout(() => input.focus(), 60);
+    }
+    if (badge) badge.style.display = 'none';
+}
+
+function closeRefPicker() {
+    const overlay = document.getElementById('ref-picker-overlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+function setPickerStep(step) {
+    pickerState.step = step;
+
+    // Update Step Tabs
+    ['book', 'chapter', 'verse'].forEach(s => {
+        const btn = document.getElementById(`step-btn-${s}`);
+        if (btn) btn.classList.toggle('active', s === step);
+    });
+
+    const stepLabelBook = document.getElementById('step-label-book');
+    const stepLabelChapter = document.getElementById('step-label-chapter');
+    const stepLabelVerse = document.getElementById('step-label-verse');
+    if (stepLabelBook) stepLabelBook.innerText = pickerState.book;
+    if (stepLabelChapter) stepLabelChapter.innerText = `Ch ${pickerState.chapter}`;
+    if (stepLabelVerse) stepLabelVerse.innerText = `V ${pickerState.verse}`;
+
+    // Toggle Views
+    const vBooks = document.getElementById('grid-view-books');
+    const vChapters = document.getElementById('grid-view-chapters');
+    const vVerses = document.getElementById('grid-view-verses');
+
+    if (vBooks) vBooks.style.display = (step === 'book') ? 'flex' : 'none';
+    if (vChapters) vChapters.style.display = (step === 'chapter') ? 'flex' : 'none';
+    if (vVerses) vVerses.style.display = (step === 'verse') ? 'flex' : 'none';
+
+    if (step === 'book') renderPickerBooks();
+    if (step === 'chapter') renderPickerChapters(pickerState.book);
+    if (step === 'verse') renderPickerVerses(pickerState.book, pickerState.chapter);
+}
+
+function renderPickerBooks() {
+    const otGrid = document.getElementById('ot-books-grid');
+    const ntGrid = document.getElementById('nt-books-grid');
+
+    if (otGrid && typeof otBooks !== 'undefined') {
+        otGrid.innerHTML = '';
+        otBooks.forEach(b => {
+            const btn = document.createElement('div');
+            btn.className = 'book-chip' + (b === pickerState.book ? ' current' : '');
+            btn.innerText = b;
+            btn.title = b;
+            btn.onclick = () => selectPickerBook(b);
+            otGrid.appendChild(btn);
+        });
+    }
+
+    if (ntGrid && typeof ntBooks !== 'undefined') {
+        ntGrid.innerHTML = '';
+        ntBooks.forEach(b => {
+            const btn = document.createElement('div');
+            btn.className = 'book-chip' + (b === pickerState.book ? ' current' : '');
+            btn.innerText = b;
+            btn.title = b;
+            btn.onclick = () => selectPickerBook(b);
+            ntGrid.appendChild(btn);
+        });
+    }
+}
+
+function selectPickerBook(book) {
+    pickerState.book = book;
+    pickerState.chapter = 1;
+    pickerState.verse = 1;
+    setPickerStep('chapter');
+}
+
+function renderPickerChapters(book) {
+    const title = document.getElementById('chapter-view-title');
+    if (title) title.innerText = `${book} - Select Chapter`;
+
+    const grid = document.getElementById('chapters-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    const chapterCount = (BIBLE_STRUCTURE[book] || []).length;
+    for (let c = 1; c <= chapterCount; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'number-cell' + (c === pickerState.chapter && book === state.book ? ' current' : '');
+        cell.innerText = c;
+        cell.onclick = () => selectPickerChapter(c);
+        grid.appendChild(cell);
+    }
+}
+
+function selectPickerChapter(ch) {
+    pickerState.chapter = ch;
+    pickerState.verse = 1;
+    setPickerStep('verse');
+}
+
+function renderPickerVerses(book, chapter) {
+    const title = document.getElementById('verse-view-title');
+    if (title) title.innerText = `${book} ${chapter} - Select Verse`;
+
+    const grid = document.getElementById('verses-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    const verseCount = (BIBLE_STRUCTURE[book] && BIBLE_STRUCTURE[book][chapter - 1]) ? BIBLE_STRUCTURE[book][chapter - 1] : 1;
+    for (let v = 1; v <= verseCount; v++) {
+        const cell = document.createElement('div');
+        cell.className = 'number-cell' + (v === pickerState.verse && chapter === state.chapter && book === state.book ? ' current' : '');
+        cell.innerText = v;
+        cell.onclick = () => selectPickerVerse(v);
+        grid.appendChild(cell);
+    }
+}
+
+function selectPickerVerse(v) {
+    pickerState.verse = v;
+    closeRefPicker();
+    jumpTo(pickerState.book, pickerState.chapter, v);
+    if (v > 1) {
+        setTimeout(() => scrollVerse(v), 250);
+    }
+}
+
+function onRefGotoInput(val) {
+    const badge = document.getElementById('ref-parsed-badge');
+    if (!badge) return;
+
+    if (!val || !val.trim()) {
+        badge.style.display = 'none';
+        return;
+    }
+
+    const parsed = parseBibleReference(val);
+    if (parsed) {
+        badge.innerText = `✓ ${parsed.formatted} (Enter to Jump)`;
+        badge.style.display = 'inline-block';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function onRefGotoKeydown(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const input = document.getElementById('inp-ref-goto');
+        if (!input) return;
+        const parsed = parseBibleReference(input.value);
+        if (parsed) {
+            closeRefPicker();
+            jumpTo(parsed.book, parsed.chapter, parsed.verse);
+            if (parsed.verse > 1) {
+                setTimeout(() => scrollVerse(parsed.verse), 250);
+            }
+        } else {
+            // Shake / feedback on unmatched input
+            input.style.boxShadow = '0 0 0 2px #ef4444';
+            setTimeout(() => input.style.boxShadow = 'none', 600);
+        }
+    } else if (e.key === 'Escape') {
+        closeRefPicker();
+    }
+}
+
+// Global Keyboard Shortcuts (Ctrl+G, /, Escape)
+document.addEventListener('keydown', e => {
+    const overlay = document.getElementById('ref-picker-overlay');
+    const isPickerOpen = overlay && overlay.style.display !== 'none';
+
+    if (isPickerOpen) {
+        if (e.key === 'Escape') {
+            closeRefPicker();
+            return;
+        }
+    }
+
+    // Ctrl+G or Cmd+G
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        openRefPicker();
+        return;
+    }
+
+    // '/' when not in an input or textarea
+    if (e.key === '/' && !isPickerOpen) {
+        const tag = (document.activeElement && document.activeElement.tagName) ? document.activeElement.tagName.toUpperCase() : '';
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
+            e.preventDefault();
+            openRefPicker();
+            return;
+        }
+    }
+});
+
+// ==========================================================================
+// Lumina Universal Custom Dropdown Engine
+// Replaces OS-native select popups with modern, fully-styled UI dropdowns
+// ==========================================================================
+
+class CustomDropdown {
+    constructor(selectEl) {
+        this.select = selectEl;
+        this.wrapper = null;
+        this.trigger = null;
+        this.labelSpan = null;
+        this.menu = null;
+        this.isOpen = false;
+        
+        this.init();
+    }
+    
+    init() {
+        if (!this.select || this.select._customDropdown) return;
+        this.select._customDropdown = this;
+        
+        // Hide native select from layout while keeping form semantics
+        this.select.style.position = 'absolute';
+        this.select.style.opacity = '0';
+        this.select.style.pointerEvents = 'none';
+        this.select.style.width = '0';
+        this.select.style.height = '0';
+        this.select.style.margin = '0';
+        this.select.style.padding = '0';
+        this.select.style.border = 'none';
+        this.select.tabIndex = -1;
+
+        // Container wrapper
+        this.wrapper = document.createElement('div');
+        this.wrapper.className = 'custom-dropdown-container';
+        if (this.select.id) this.wrapper.dataset.for = this.select.id;
+        
+        // Inherit styling hooks
+        if (this.select.classList.contains('verse-select')) {
+            this.wrapper.classList.add('custom-dropdown-verse');
+        }
+        if (this.select.classList.contains('comm-module-select')) {
+            this.wrapper.classList.add('custom-dropdown-comm');
+        }
+        if (this.select.classList.contains('pane-type-select')) {
+            this.wrapper.classList.add('custom-dropdown-pane');
+        }
+
+        // Trigger Button
+        this.trigger = document.createElement('button');
+        this.trigger.type = 'button';
+        this.trigger.className = 'custom-dropdown-trigger';
+        if (this.select.title) this.trigger.title = this.select.title;
+        
+        this.labelSpan = document.createElement('span');
+        this.labelSpan.className = 'custom-dropdown-label';
+        
+        const arrow = document.createElement('span');
+        arrow.className = 'custom-dropdown-caret';
+        arrow.textContent = '▾';
+        
+        this.trigger.appendChild(this.labelSpan);
+        this.trigger.appendChild(arrow);
+        
+        // Dropdown Menu Container
+        this.menu = document.createElement('div');
+        this.menu.className = 'custom-dropdown-menu';
+        this.menu.style.display = 'none';
+        
+        this.wrapper.appendChild(this.trigger);
+        this.wrapper.appendChild(this.menu);
+        
+        // Insert right after select in DOM
+        if (this.select.parentNode) {
+            this.select.parentNode.insertBefore(this.wrapper, this.select.nextSibling);
+        }
+        
+        // Populate items
+        this.rebuildMenu();
+        
+        // Intercept direct programmatic assignment of select.value
+        const self = this;
+        const originalDescriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+        if (originalDescriptor && originalDescriptor.set) {
+            Object.defineProperty(this.select, 'value', {
+                configurable: true,
+                get() {
+                    return originalDescriptor.get.call(this);
+                },
+                set(newVal) {
+                    originalDescriptor.set.call(this, newVal);
+                    self.syncFromSelect();
+                }
+            });
+        }
+        
+        // Click to toggle
+        this.trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (this.select.disabled) return;
+            this.toggle();
+        });
+        
+        // Change event sync
+        this.select.addEventListener('change', () => {
+            this.syncFromSelect();
+        });
+
+        // Watch for dynamic options changes (e.g. verse counts, translations loaded)
+        this.observer = new MutationObserver(() => {
+            this.rebuildMenu();
+        });
+        this.observer.observe(this.select, { childList: true, subtree: true, attributes: true });
+    }
+    
+    rebuildMenu() {
+        this.menu.innerHTML = '';
+        const options = Array.from(this.select.options);
+        
+        if (options.length === 0) {
+            this.labelSpan.textContent = '-';
+            return;
+        }
+
+        const optgroups = this.select.querySelectorAll('optgroup');
+        if (optgroups.length > 0) {
+            optgroups.forEach(group => {
+                const header = document.createElement('div');
+                header.className = 'custom-dropdown-group-header';
+                header.textContent = group.label;
+                this.menu.appendChild(header);
+                
+                Array.from(group.children).forEach(opt => {
+                    this.createItem(opt);
+                });
+            });
+        } else {
+            options.forEach(opt => {
+                this.createItem(opt);
+            });
+        }
+        
+        this.syncFromSelect();
+    }
+    
+    createItem(opt) {
+        const item = document.createElement('div');
+        item.className = 'custom-dropdown-item';
+        item.dataset.value = opt.value;
+        
+        if (opt.disabled) {
+            item.classList.add('disabled');
+        }
+        
+        const textSpan = document.createElement('span');
+        textSpan.className = 'custom-dropdown-item-text';
+        textSpan.textContent = opt.text;
+        item.appendChild(textSpan);
+        
+        const checkSpan = document.createElement('span');
+        checkSpan.className = 'custom-dropdown-check';
+        checkSpan.textContent = '✓';
+        item.appendChild(checkSpan);
+        
+        if (!opt.disabled) {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.selectValue(opt.value);
+            });
+        }
+        
+        this.menu.appendChild(item);
+    }
+    
+    selectValue(val) {
+        this.select.value = val;
+        this.select.dispatchEvent(new Event('change', { bubbles: true }));
+        if (typeof this.select.onchange === 'function') {
+            this.select.onchange(new Event('change'));
+        }
+        this.syncFromSelect();
+        this.close();
+    }
+    
+    syncFromSelect() {
+        const selectedOpt = this.select.options[this.select.selectedIndex];
+        if (selectedOpt) {
+            this.labelSpan.textContent = selectedOpt.text;
+        } else {
+            this.labelSpan.textContent = '';
+        }
+        
+        const items = this.menu.querySelectorAll('.custom-dropdown-item');
+        items.forEach(item => {
+            if (item.dataset.value === this.select.value) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+        
+        if (this.select.disabled) {
+            this.trigger.classList.add('disabled');
+        } else {
+            this.trigger.classList.remove('disabled');
+        }
+    }
+    
+    open() {
+        CustomDropdown.closeAll();
+        
+        // Smart screen edge positioning
+        const rect = this.wrapper.getBoundingClientRect();
+        
+        if (window.innerWidth - rect.left < 280) {
+            this.menu.style.left = 'auto';
+            this.menu.style.right = '0';
+        } else {
+            this.menu.style.left = '0';
+            this.menu.style.right = 'auto';
+        }
+        
+        if (window.innerHeight - rect.bottom < 260) {
+            this.menu.style.top = 'auto';
+            this.menu.style.bottom = 'calc(100% + 4px)';
+        } else {
+            this.menu.style.top = 'calc(100% + 4px)';
+            this.menu.style.bottom = 'auto';
+        }
+        
+        this.menu.style.display = 'flex';
+        this.trigger.classList.add('open');
+        this.isOpen = true;
+        
+        const activeItem = this.menu.querySelector('.custom-dropdown-item.active');
+        if (activeItem) {
+            activeItem.scrollIntoView({ block: 'nearest' });
+        }
+    }
+    
+    close() {
+        this.menu.style.display = 'none';
+        this.trigger.classList.remove('open');
+        this.isOpen = false;
+    }
+    
+    toggle() {
+        if (this.isOpen) {
+            this.close();
+        } else {
+            this.open();
+        }
+    }
+    
+    static closeAll() {
+        document.querySelectorAll('.custom-dropdown-menu').forEach(m => m.style.display = 'none');
+        document.querySelectorAll('.custom-dropdown-trigger').forEach(t => t.classList.remove('open'));
+    }
+}
+
+// Global Document Listeners
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.custom-dropdown-container')) {
+        CustomDropdown.closeAll();
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        CustomDropdown.closeAll();
+    }
+});
+
+// Auto-upgrade helper for all matching selects
+function initAllCustomDropdowns(root = document) {
+    const selects = root.querySelectorAll('select:not([data-no-custom])');
+    selects.forEach(sel => {
+        if (sel.id === 'sel-book' || sel.style.display === 'none') return;
+        if (!sel._customDropdown) {
+            new CustomDropdown(sel);
+        }
+    });
 }

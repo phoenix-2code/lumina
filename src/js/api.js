@@ -50,27 +50,17 @@ function loadPane(paneId, retryCount = 0) {
 }
 
 function renderBibleText(container, verses) {
+    state.currentVerses = verses;
     let html = '';
     verses.forEach(v => {
         let text = v.text;
         // Legacy manual replacements if DB doesn't have interlinear
         if (!state.interlinear && !v.strongs) {
-            text = text.replace(/God/g, 'God<sup class="strongs" onclick="event.stopPropagation(); showDef(\'H430\', \'strong_hebrew\')">H430</sup>');
-        }
-        
-        let linksHtml = '';
-        if (v.modules) {
-            const mods = v.modules.split(',');
-            linksHtml = '<div class="verse-links">';
-            mods.forEach(m => {
-                linksHtml += `<span class="v-link" onclick="event.stopPropagation(); openComm('${m}', ${v.verse})">${m}</span>`;
-            });
-            linksHtml += '</div>';
+            text = text.replace(/God/g, '<span class="has-strongs">God<sup class="strongs" onclick="event.stopPropagation(); showDef(\'H430\', \'strong_hebrew\')">H430</sup></span>');
         }
         
         html += `<div class="verse-row ${v.verse == state.verse ? 'active' : ''}" id="v-${v.verse}" onclick="setVerse(${v.verse})">
                     <span class="v-num">${v.verse}</span>${text}
-                    ${linksHtml}
                  </div>`;
     });
     container.innerHTML = html;
@@ -97,15 +87,23 @@ function updatePaneContent(paneId) {
             return;
         }
         
-        contentDiv.innerHTML = 'Loading...';
+        contentDiv.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted); font-size:14px;">Loading commentary...</div>';
         const apiUrl = `${API_BASE}/api/study/commentary?book=${encodeURIComponent(state.book)}&chapter=${state.chapter}&verse=${state.verse}&module=${state.commModule}`;
         fetch(apiUrl)
             .then(r => r.json())
             .then(data => {
-                Cache.set('commentary', cacheKey, data.text);
-                renderCommentary(contentDiv, data.text);
+                if (data.module && data.module.toLowerCase() !== state.commModule.toLowerCase()) {
+                    state.commModule = data.module.toLowerCase();
+                    const titleSpan = document.getElementById('pane-2-title');
+                    const fullName = (typeof moduleNames !== 'undefined' && moduleNames[state.commModule.toUpperCase()]) || state.commModule.toUpperCase();
+                    if (titleSpan) titleSpan.innerText = `Commentary (${fullName})`;
+                }
+                Cache.set('commentary', cacheKey, data);
+                renderCommentary(contentDiv, data);
             })
-            .catch(e => contentDiv.innerHTML = "Error loading commentary.");
+            .catch(e => {
+                contentDiv.innerHTML = '<div class="comm-card" style="color:#ef4444; padding:20px;">Error loading commentary.</div>';
+            });
 
     } else if (type === 'xrefs') {
         const cacheKey = `${state.book}_${state.chapter}_${state.verse}`;
@@ -251,11 +249,56 @@ function loadMoreResults(paneId) {
     updatePaneContent(paneId);
 }
 
-function renderCommentary(container, text) {
+function renderCommentary(container, data) {
+    let text = typeof data === 'object' && data !== null ? data.text : data;
+    let availableModules = (data && Array.isArray(data.available_modules)) ? data.available_modules : [];
+    
+    // Fallback: check state.currentVerses if available_modules not provided in data
+    if ((!availableModules || availableModules.length === 0) && state.currentVerses && state.currentVerses.length > 0) {
+        const verseObj = state.currentVerses.find(v => v.verse == state.verse);
+        if (verseObj && verseObj.modules) {
+            availableModules = verseObj.modules.split(',').map(m => m.trim().toLowerCase()).filter(Boolean);
+        }
+    }
+
+    const hasModules = availableModules && availableModules.length > 0;
+    let optionsHtml = '';
+
+    if (hasModules) {
+        availableModules.forEach(modCode => {
+            const codeUpper = modCode.toUpperCase();
+            const fullName = (typeof moduleNames !== 'undefined' && moduleNames[codeUpper]) 
+                ? `${moduleNames[codeUpper]} (${codeUpper})` 
+                : codeUpper;
+            const isSel = (state.commModule.toLowerCase() === modCode.toLowerCase()) ? 'selected' : '';
+            optionsHtml += `<option value="${modCode.toLowerCase()}" ${isSel}>${fullName}</option>`;
+        });
+    } else {
+        optionsHtml = `<option value="" disabled selected>No commentaries for this verse</option>`;
+    }
+
+    const countBadge = hasModules 
+        ? `<span class="comm-avail-badge">${availableModules.length} Available</span>` 
+        : `<span class="comm-avail-badge empty">None Available</span>`;
+
     container.innerHTML = `<div class="comm-card">
-                        <h3 style="margin-top:0; border-bottom:1px solid var(--border); padding-bottom:10px;">${state.book} ${state.chapter}:${state.verse} (${state.commModule.toUpperCase()})</h3>
-                        ${text || "No commentary found."} 
-                      </div>`;
+        <div class="comm-card-header">
+            <div class="comm-header-title">
+                <span class="comm-book-icon">📖</span>
+                <span class="comm-ref-text">${state.book} ${state.chapter}:${state.verse}</span>
+                ${countBadge}
+            </div>
+            <div class="comm-header-select-wrap">
+                <select class="toolbar-select comm-module-select" onchange="setCommModule(this.value)" ${!hasModules ? 'disabled' : ''} title="Switch Commentary">
+                    ${optionsHtml}
+                </select>
+            </div>
+        </div>
+        <div class="comm-body">
+            ${text || "No commentary notes found for this verse."}
+        </div>
+    </div>`;
+    if (typeof initAllCustomDropdowns === 'function') initAllCustomDropdowns(container);
 }
 
 function renderXrefs(container, refs) {
@@ -307,6 +350,7 @@ function renderDictLayout(container, currentMod) {
                 <div id="dict-definition">${state.lookupTerm ? 'Loading...' : '<div style="display:flex; justify-content:center; align-items:center; height:100%; color:var(--text-muted);">Select an item</div>'}
             </div>
         </div>`;
+    if (typeof initAllCustomDropdowns === 'function') initAllCustomDropdowns(container);
 }
 
 function renderTopicList(container, topics, currentMod) {

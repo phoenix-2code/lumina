@@ -28,19 +28,49 @@
     
     <div class="ribbon-content" id="tab-bible">
         <div class="ribbon-group"><div class="control-pod">
-            <button id="btn-nav-back" onclick="goBack()" style="font-weight:900;" title="Back History">‹</button>
-            <button id="btn-nav-fwd" onclick="goForward()" style="font-weight:900;" title="Forward History">›</button>
-            <div style="height:20px; border-left:1px solid var(--border); margin:0 2px;"></div>
-            <button onclick="navStep(-1)" title="Previous Chapter">←</button>
-            <select id="sel-book" onchange="navigate()"></select>
-            <input type="number" id="inp-chapter" value="1" min="1" style="width:40px; border:none; background:transparent; font-weight:bold; text-align:center;" onchange="navigate()">
-            <select id="sel-verse" onchange="setVerse(this.value); scrollVerse(this.value)" style="width:50px; border:none; background:transparent; font-weight:bold;"></select>
-            <button onclick="navStep(1)" title="Next Chapter">→</button>
-        </div><div class="ribbon-label">Navigation</div></div>
+            <button id="btn-nav-back" class="toolbar-btn nav-btn" onclick="goBack()" title="Back History">‹</button>
+            <button id="btn-nav-fwd" class="toolbar-btn nav-btn" onclick="goForward()" title="Forward History">›</button>
+            <div class="toolbar-divider"></div>
+            <button class="toolbar-btn nav-btn" onclick="navStep(-1)" title="Previous Chapter">←</button>
+            
+            <!-- Unified Reference Button -->
+            <button id="btn-ref-picker" onclick="toggleRefPicker()" title="Choose Reference or Press Ctrl+G / /" class="ref-trigger-btn">
+                <span class="ref-book-icon">📖</span>
+                <span id="lbl-current-ref">Genesis 1:1</span>
+                <span class="ref-caret">▾</span>
+            </button>
+            
+            <div class="toolbar-divider"></div>
+            
+            <!-- Styled Chapter selector with label -->
+            <div class="toolbar-stepper-group" title="Chapter Number">
+                <span class="toolbar-label">Ch</span>
+                <input type="number" id="inp-chapter" value="1" min="1" class="toolbar-num-input" onchange="navigate()">
+            </div>
+
+            <!-- Styled Verse dropdown with label -->
+            <div class="toolbar-stepper-group" title="Verse Selector">
+                <span class="toolbar-label">v</span>
+                <select id="sel-verse" class="toolbar-select verse-select" onchange="setVerse(this.value); scrollVerse(this.value)"></select>
+            </div>
+
+            <!-- Hidden book select for backward compatibility -->
+            <select id="sel-book" style="display:none;"></select>
+
+            <button class="toolbar-btn nav-btn" onclick="navStep(1)" title="Next Chapter">→</button>
+        </div><div class="ribbon-label">Navigation (Ctrl+G or /)</div></div>
         
         <div class="ribbon-group"><div class="control-pod">
-            <select id="sel-version" onchange="reloadPanes()"></select>
-            <button onclick="toggleInterlinear()" id="btn-interlinear">Interlinear: OFF</button>
+            <select id="sel-version" class="toolbar-select" onchange="reloadPanes()" title="Bible Translation"></select>
+            <div class="toolbar-divider"></div>
+            <!-- Interlinear Toggle Switch -->
+            <label class="toggle-switch-pod" title="Toggle Interlinear Strong's Display">
+                <span class="toggle-label">Interlinear</span>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="chk-interlinear" onchange="toggleInterlinear(this.checked)">
+                    <span class="toggle-slider"></span>
+                </div>
+            </label>
         </div><div class="ribbon-label">Translation</div></div>
         
         <div class="ribbon-group"><button onclick="changePaneContent('pane-2', 'xrefs')" class="primary">Show Cross-Refs</button><div class="ribbon-label">Study Tools</div></div>
@@ -55,10 +85,10 @@
 
     <div class="ribbon-content" id="tab-dict" style="display:none;">
         <div class="ribbon-group"><div class="control-pod">
-            <select id="sel-dict-mod" onchange="state.dictModule=this.value; changePaneContent('pane-2','dictionary')">
+            <select id="sel-dict-mod" class="toolbar-select" onchange="state.dictModule=this.value; changePaneContent('pane-2','dictionary')">
                 <option value="EASTON">Easton's</option><option value="SMITH">Smith's</option><option value="ATSD">ATSD</option><option value="NAMES">Names</option>
             </select>
-            <div style="height:20px; border-left:1px solid var(--border); margin:0 2px;"></div>
+            <div class="toolbar-divider"></div>
             <input type="text" id="inp-dict-search" placeholder="Search..." onkeydown="if(event.key==='Enter') searchDict()">
             <button onclick="searchDict()" class="primary">Find</button>
         </div><div class="ribbon-label">Dictionary</div></div>
@@ -66,10 +96,10 @@
 
     <div class="ribbon-content" id="tab-lex" style="display:none;">
         <div class="ribbon-group"><div class="control-pod">
-            <select id="sel-lex-mod" onchange="state.lexModule=this.value; changePaneContent('pane-2','lex_browse')">
+            <select id="sel-lex-mod" class="toolbar-select" onchange="state.lexModule=this.value; changePaneContent('pane-2','lex_browse')">
                 <option value="HEBREW">Hebrew</option><option value="GREEK">Greek</option>
             </select>
-            <div style="height:20px; border-left:1px solid var(--border); margin:0 2px;"></div>
+            <div class="toolbar-divider"></div>
             <input type="text" id="inp-lex-search" placeholder="H123..." onkeydown="if(event.key==='Enter') searchLex()">
             <button onclick="searchLex()" class="primary">Find</button>
         </div><div class="ribbon-label">Lexicon</div></div>
@@ -77,15 +107,15 @@
 
     <div class="ribbon-content" id="tab-search" style="display:none;">
         <div class="ribbon-group"><div class="control-pod">
-            <select id="sel-search-scope"><option value="ALL">Entire Bible</option><option value="OT">Old Testament</option><option value="NT">New Testament</option><option value="CURRENT">Current Book</option></select>
-            <div style="height:20px; border-left:1px solid var(--border); margin:0 2px;"></div>
+            <select id="sel-search-scope" class="toolbar-select"><option value="ALL">Entire Bible</option><option value="OT">Old Testament</option><option value="NT">New Testament</option><option value="CURRENT">Current Book</option></select>
+            <div class="toolbar-divider"></div>
             <input type="text" id="inp-bible-search" placeholder="Words..." onkeydown="if(event.key==='Enter') searchBible()" style="min-width:200px; border:none; background:transparent;">
             <button onclick="searchBible()" class="primary">Search</button>
         </div><div class="ribbon-label">Search</div></div>
     </div>
 
     <div class="ribbon-content" id="tab-win" style="display:none;">
-        <div class="ribbon-group"><div class="control-pod"><button onclick="setLayout('vertical')">|| Vertical</button><div style="height:20px; border-left:1px solid var(--border); margin:0 2px;"></div><button onclick="setLayout('horizontal')">= Horizontal</button></div><div class="ribbon-label">Layout</div></div>
+        <div class="ribbon-group"><div class="control-pod"><button onclick="setLayout('vertical')">|| Vertical</button><div class="toolbar-divider"></div><button onclick="setLayout('horizontal')">= Horizontal</button></div><div class="ribbon-label">Layout</div></div>
         <div class="ribbon-group"><button onclick="resetLayout()">Restore Windows</button><div class="ribbon-label">Manager</div></div>
     </div>
 
@@ -131,40 +161,110 @@
 <div id="workspace" class="layout-vertical">
     <div class="pane" id="pane-1" data-type="bible">
         <div class="pane-header">
-            <div>
-                <select onchange="changePaneContent('pane-1', this.value)">
-                    <option value="bible">Bible</option>
-                    <option value="commentary">Commentary</option>
+            <div class="pane-header-left">
+                <select class="pane-type-select" onchange="changePaneContent('pane-1', this.value)">
+                    <option value="bible">📖 Bible Text</option>
+                    <option value="commentary">💬 Commentary</option>
                 </select>
-                <span id="pane-1-title"></span>
+                <span id="pane-1-title" class="pane-title"></span>
             </div>
             <div class="win-controls">
-                <div class="win-btn" onclick="toggleMin('pane-1')">_</div>
-                <div class="win-btn" onclick="toggleMax('pane-1')">□</div>
-                <div class="win-btn close" onclick="closePane('pane-1')">×</div>
+                <button class="win-btn" onclick="toggleMin('pane-1')" title="Minimize">─</button>
+                <button class="win-btn" onclick="toggleMax('pane-1')" title="Maximize">□</button>
+                <button class="win-btn close" onclick="closePane('pane-1')" title="Close">✕</button>
             </div>
         </div>
         <div class="pane-content" id="pane-1-content"></div>
     </div>
     <div class="pane" id="pane-2" data-type="commentary">
         <div class="pane-header">
-            <div>
-                <select onchange="changePaneContent('pane-2', this.value)">
-                    <option value="commentary">Commentary</option>
-                    <option value="xrefs">Cross-Refs</option>
-                    <option value="dictionary">Dictionary</option>
-                    <option value="lex_browse">Lexicon</option>
-                    <option value="search">Search</option>
+            <div class="pane-header-left">
+                <select class="pane-type-select" onchange="changePaneContent('pane-2', this.value)">
+                    <option value="commentary">💬 Commentary</option>
+                    <option value="xrefs">🔗 Cross-Refs</option>
+                    <option value="dictionary">📚 Dictionary</option>
+                    <option value="lex_browse">🔤 Lexicon</option>
+                    <option value="search">🔍 Search</option>
                 </select>
-                <span id="pane-2-title"></span>
+                <span id="pane-2-title" class="pane-title"></span>
             </div>
             <div class="win-controls">
-                <div class="win-btn" onclick="toggleMin('pane-2')">_</div>
-                <div class="win-btn" onclick="toggleMax('pane-2')">□</div>
-                <div class="win-btn close" onclick="closePane('pane-2')">×</div>
+                <button class="win-btn" onclick="toggleMin('pane-2')" title="Minimize">─</button>
+                <button class="win-btn" onclick="toggleMax('pane-2')" title="Maximize">□</button>
+                <button class="win-btn close" onclick="closePane('pane-2')" title="Close">✕</button>
             </div>
         </div>
         <div class="pane-content" id="pane-2-content"></div>
+    </div>
+</div>
+
+<!-- Reference Navigator Popover (Go to Box + 3-Step Grid) -->
+<div id="ref-picker-overlay" class="ref-picker-overlay" style="display:none;" onclick="if(event.target === this) closeRefPicker()">
+    <div id="ref-picker-modal" class="ref-picker-modal">
+        <!-- Top Bar: "Go to" Box -->
+        <div class="ref-search-bar">
+            <span class="ref-search-icon">🔍</span>
+            <input type="text" id="inp-ref-goto" placeholder="Type verse (e.g. jn 3:16, 1 cor 13, ps 23)..." autocomplete="off" spellcheck="false" oninput="onRefGotoInput(this.value)" onkeydown="onRefGotoKeydown(event)">
+            <span id="ref-parsed-badge" class="ref-parsed-badge" style="display:none;"></span>
+            <button class="ref-close-btn" onclick="closeRefPicker()" title="Close (Esc)">✕</button>
+        </div>
+
+        <!-- Breadcrumb / Steps Navigation -->
+        <div class="ref-steps-bar">
+            <button id="step-btn-book" class="ref-step-btn active" onclick="setPickerStep('book')">
+                <span class="step-num">1</span>
+                <span class="step-label" id="step-label-book">Book</span>
+            </button>
+            <span class="step-arrow">›</span>
+            <button id="step-btn-chapter" class="ref-step-btn" onclick="setPickerStep('chapter')">
+                <span class="step-num">2</span>
+                <span class="step-label" id="step-label-chapter">Chapter</span>
+            </button>
+            <span class="step-arrow">›</span>
+            <button id="step-btn-verse" class="ref-step-btn" onclick="setPickerStep('verse')">
+                <span class="step-num">3</span>
+                <span class="step-label" id="step-label-verse">Verse</span>
+            </button>
+        </div>
+
+        <!-- Grid Content Area -->
+        <div class="ref-picker-content">
+            <!-- Step 1: Books Grid -->
+            <div id="grid-view-books" class="picker-view">
+                <div class="books-testament-section">
+                    <div class="testament-header">Old Testament (39)</div>
+                    <div id="ot-books-grid" class="books-grid"></div>
+                </div>
+                <div class="books-testament-section" style="margin-top:14px;">
+                    <div class="testament-header">New Testament (27)</div>
+                    <div id="nt-books-grid" class="books-grid"></div>
+                </div>
+            </div>
+
+            <!-- Step 2: Chapters Grid -->
+            <div id="grid-view-chapters" class="picker-view" style="display:none;">
+                <div class="picker-view-header">
+                    <button class="picker-back-btn" onclick="setPickerStep('book')">‹ Books</button>
+                    <span id="chapter-view-title" class="picker-view-title">Genesis</span>
+                </div>
+                <div id="chapters-grid" class="numbers-grid"></div>
+            </div>
+
+            <!-- Step 3: Verses Grid -->
+            <div id="grid-view-verses" class="picker-view" style="display:none;">
+                <div class="picker-view-header">
+                    <button class="picker-back-btn" onclick="setPickerStep('chapter')">‹ Chapters</button>
+                    <span id="verse-view-title" class="picker-view-title">Genesis 1</span>
+                    <button class="picker-whole-chapter-btn" onclick="selectPickerVerse(1)">Whole Chapter</button>
+                </div>
+                <div id="verses-grid" class="numbers-grid"></div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="ref-picker-footer">
+            <span>Press <kbd>Enter</kbd> to jump, <kbd>Esc</kbd> to close &bull; Shortcut: <kbd>Ctrl+G</kbd> or <kbd>/</kbd></span>
+        </div>
     </div>
 </div>
 
